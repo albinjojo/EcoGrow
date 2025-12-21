@@ -31,7 +31,7 @@ export const handleSignup = async (payload) => {
 }
 
 export const handleGoogleAuth = async (token) => {
-  const res = await fetch(`${API_BASE}/auth/google`, {
+  const res = await fetch(`${API_BASE}/google`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
@@ -41,7 +41,7 @@ export const handleGoogleAuth = async (token) => {
 }
 
 export const startGoogleOAuth = () => {
-  window.location.href = `${API_BASE}/auth/google/start`
+  window.location.href = `${API_BASE}/google/start`
 }
 
 export const requestPasswordReset = async (email) => {
