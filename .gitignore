@@ -25,5 +25,4 @@ dist-ssr
 
 # Environment files (keep secrets local)
 .env
-**/.env
 *.env.local
