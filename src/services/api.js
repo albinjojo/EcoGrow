@@ -45,10 +45,19 @@ export const startGoogleOAuth = () => {
 }
 
 export const requestPasswordReset = async (email) => {
-  const res = await fetch(`${API_BASE}/auth/forgot-password`, {
+  const res = await fetch(`${API_BASE}/forgot-password`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email }),
+  })
+  return parseResponse(res)
+}
+
+export const resetPassword = async (payload) => {
+  const res = await fetch(`${API_BASE}/reset-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
   })
   return parseResponse(res)
 }

@@ -10,7 +10,12 @@ Security highlights:
 """
 
 import os
+import hashlib
+import secrets
+from datetime import datetime, timedelta
 import bcrypt
+import smtplib
+from email.message import EmailMessage
 from urllib.parse import urlencode
 from flask import Flask, jsonify, redirect, request, session
 from flask_cors import CORS
@@ -41,6 +46,13 @@ CORS(app, origins=get_cors_origins(), supports_credentials=True)
 app.secret_key = os.environ.get("FLASK_SECRET", "dev-secret-change")
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = False
+RESET_LINK_DEBUG = bool(int(os.environ.get("RESET_LINK_DEBUG", "0")))
+SMTP_HOST = os.environ.get("SMTP_HOST")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "465"))
+SMTP_USER = os.environ.get("SMTP_USER")
+SMTP_PASS = os.environ.get("SMTP_PASS")
+SMTP_FROM = os.environ.get("SMTP_FROM", "no-reply@ecogrow.local")
+SMTP_USE_TLS = bool(int(os.environ.get("SMTP_USE_TLS", "0")))
 
 
 def hash_password(password: str) -> str:
@@ -95,6 +107,54 @@ def get_user_with_password(conn, email: str):
   row = cur.fetchone()
   cur.close()
   return row
+
+
+def get_user_id(conn, email: str):
+  """Return user id and provider for a given email, or None."""
+  cur = conn.cursor()
+  cur.execute("SELECT id, provider FROM users WHERE email=%s LIMIT 1", (email,))
+  row = cur.fetchone()
+  cur.close()
+  return row
+
+
+def hash_reset_token(raw: str) -> str:
+  return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def create_reset_request(conn, user_id: int, ttl_minutes: int = 30) -> str:
+  token = secrets.token_urlsafe(32)
+  token_hash = hash_reset_token(token)
+  expires_at = datetime.utcnow() + timedelta(minutes=ttl_minutes)
+  cur = conn.cursor()
+  cur.execute(
+    "INSERT INTO password_resets (user_id, token_hash, expires_at) VALUES (%s, %s, %s)",
+    (user_id, token_hash, expires_at),
+  )
+  conn.commit()
+  cur.close()
+  return token
+
+
+def send_reset_email(to_email: str, reset_link: str):
+  if not SMTP_HOST or not SMTP_USER or not SMTP_PASS:
+    raise RuntimeError("SMTP is not configured (SMTP_HOST/USER/PASS)")
+
+  msg = EmailMessage()
+  msg["Subject"] = "Reset your EcoGrow password"
+  msg["From"] = SMTP_FROM
+  msg["To"] = to_email
+  msg.set_content(f"Click the link to reset your password: {reset_link}\nIf you did not request this, you can ignore it.")
+
+  if SMTP_USE_TLS:
+    with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as smtp:
+      smtp.starttls()
+      smtp.login(SMTP_USER, SMTP_PASS)
+      smtp.send_message(msg)
+  else:
+    with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT) as smtp:
+      smtp.login(SMTP_USER, SMTP_PASS)
+      smtp.send_message(msg)
 
 
 def build_google_flow(state: str | None = None):
@@ -185,6 +245,97 @@ def login_user():
     return jsonify({"message": "Login successful.", "role": role}), 200
   except Exception:
     return jsonify({"message": "Unable to process login right now."}), 500
+  finally:
+    conn.close()
+
+
+@app.post("/api/forgot-password")
+def forgot_password():
+  data = request.get_json(silent=True) or {}
+  email = (data.get("email") or "").strip()
+
+  if not validate_email(email):
+    return jsonify({"message": "If the account exists, a reset link will be emailed."}), 200
+
+  conn = get_connection()
+  try:
+    user_row = get_user_id(conn, email)
+    if not user_row:
+      # Avoid revealing account existence
+      return jsonify({"message": "If the account exists, a reset link will be emailed."}), 200
+
+    user_id, provider = user_row
+    if provider != "password":
+      return jsonify({"message": "If the account exists, a reset link will be emailed."}), 200
+
+    token = create_reset_request(conn, user_id)
+    frontend_origin = os.environ.get("CORS_ORIGIN", "http://localhost:5173").split(",")[0].strip()
+    reset_link = f"{frontend_origin}/reset?token={token}"
+
+    # Send reset email (SMTP must be configured via env vars)
+    send_reset_email(email, reset_link)
+
+    response_body = {"message": "If the account exists, a reset link will be emailed."}
+    if RESET_LINK_DEBUG:
+      response_body["reset_link"] = reset_link
+
+    return jsonify(response_body), 200
+  except Exception:
+    return jsonify({"message": "Unable to process reset right now."}), 500
+  finally:
+    conn.close()
+
+
+@app.post("/api/reset-password")
+def reset_password():
+  data = request.get_json(silent=True) or {}
+  token = (data.get("token") or "").strip()
+  password = data.get("password") or ""
+  confirm = data.get("confirmPassword") or ""
+
+  if not token:
+    return jsonify({"message": "Reset token is required."}), 400
+  if password != confirm:
+    return jsonify({"message": "Passwords do not match."}), 400
+  if not validate_password(password):
+    return jsonify({"message": "Password must be 8+ chars and include upper, lower, number, and special."}), 400
+
+  token_hash = hash_reset_token(token)
+  conn = get_connection()
+  try:
+    cur = conn.cursor()
+    cur.execute(
+      """
+      SELECT pr.id, pr.user_id, u.provider
+      FROM password_resets pr
+      JOIN users u ON u.id = pr.user_id
+      WHERE pr.token_hash=%s AND pr.used=0 AND pr.expires_at > NOW()
+      LIMIT 1
+      """,
+      (token_hash,),
+    )
+    row = cur.fetchone()
+    if not row:
+      cur.close()
+      return jsonify({"message": "Invalid or expired reset link."}), 400
+
+    reset_id, user_id, provider = row
+    if provider != "password":
+      cur.close()
+      return jsonify({"message": "Invalid or expired reset link."}), 400
+
+    pw_hash = hash_password(password)
+
+    conn.start_transaction()
+    cur.execute("UPDATE users SET password_hash=%s WHERE id=%s", (pw_hash, user_id))
+    cur.execute("UPDATE password_resets SET used=1 WHERE id=%s", (reset_id,))
+    conn.commit()
+    cur.close()
+
+    return jsonify({"message": "Password updated successfully."}), 200
+  except Exception:
+    conn.rollback()
+    return jsonify({"message": "Unable to reset password right now."}), 500
   finally:
     conn.close()
 
