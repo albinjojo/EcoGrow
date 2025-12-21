@@ -1,4 +1,5 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000/api'
+// Point to Flask backend (default http://localhost:5000/api). Override with VITE_API_URL in .env.local.
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
 const parseResponse = async (response) => {
   const data = await response.json().catch(() => ({}))
@@ -20,7 +21,7 @@ export const handleLogin = async (payload) => {
 }
 
 export const handleSignup = async (payload) => {
-  const res = await fetch(`${API_BASE}/auth/signup`, {
+  const res = await fetch(`${API_BASE}/signup`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',

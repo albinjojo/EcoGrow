@@ -2,6 +2,7 @@ import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import LoginPage from './pages/LoginPage'
 import SignupPage from './pages/SignupPage'
+import LandingPage from './pages/LandingPage'
 import heroImage from './assets/farm.png'
 import './App.css'
 
@@ -85,6 +86,7 @@ function App() {
           </AuthLayout>
         }
       />
+      <Route path="/welcome" element={<LandingPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

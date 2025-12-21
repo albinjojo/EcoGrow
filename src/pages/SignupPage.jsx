@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { handleSignup, startGoogleOAuth } from '../services/api'
 import { validateUserInput } from '../utils/validation'
 
@@ -22,6 +22,7 @@ const InputField = ({ label, name, type = 'text', placeholder, value, onChange, 
 }
 
 const SignupPage = () => {
+  const navigate = useNavigate()
   const [form, setForm] = useState({ email: '', password: '', confirmPassword: '', role: 'USER' })
   const [errors, setErrors] = useState({})
   const [status, setStatus] = useState(null)
@@ -46,6 +47,7 @@ const SignupPage = () => {
     try {
       const result = await handleSignup(form)
       setStatus({ type: 'success', message: result?.message || 'Signup successful.' })
+      navigate('/welcome', { replace: true })
     } catch (err) {
       setStatus({ type: 'error', message: err.message || 'Unable to signup right now.' })
     } finally {
