@@ -85,6 +85,18 @@ def upsert_google_user(conn, email: str):
   return (new_id, "USER")
 
 
+def get_user_with_password(conn, email: str):
+  """Fetch user id, hash, provider, and role for login."""
+  cur = conn.cursor()
+  cur.execute(
+    "SELECT id, email, password_hash, provider, role FROM users WHERE email=%s LIMIT 1",
+    (email,),
+  )
+  row = cur.fetchone()
+  cur.close()
+  return row
+
+
 def build_google_flow(state: str | None = None):
   client_id = os.environ.get("GOOGLE_CLIENT_ID")
   client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
@@ -135,6 +147,44 @@ def signup_user():
   except Exception:
     # Do not leak internal errors or SQL details
     return jsonify({"message": "Unable to process signup right now."}), 500
+  finally:
+    conn.close()
+
+
+@app.post("/api/login")
+def login_user():
+  data = request.get_json(silent=True) or {}
+  email = (data.get("email") or "").strip()
+  password = data.get("password") or ""
+
+  if not validate_email(email):
+    return jsonify({"message": "Invalid email format."}), 400
+  if not password:
+    return jsonify({"message": "Password is required."}), 400
+
+  conn = get_connection()
+  try:
+    user_row = get_user_with_password(conn, email)
+    if not user_row:
+      return jsonify({"message": "Invalid credentials."}), 401
+
+    user_id, _, password_hash, provider, role = user_row
+    if provider != "password":
+      return jsonify({"message": "Use Google sign-in for this account."}), 400
+
+    if not password_hash:
+      return jsonify({"message": "Invalid credentials."}), 401
+
+    if not bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8")):
+      return jsonify({"message": "Invalid credentials."}), 401
+
+    session["user_id"] = user_id
+    session["email"] = email
+    session["role"] = role
+
+    return jsonify({"message": "Login successful.", "role": role}), 200
+  except Exception:
+    return jsonify({"message": "Unable to process login right now."}), 500
   finally:
     conn.close()
 

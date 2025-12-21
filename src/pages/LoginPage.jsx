@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { handleLogin, startGoogleOAuth } from '../services/api'
 import { validateUserInput } from '../utils/validation'
 
@@ -48,6 +48,7 @@ const StatusText = ({ status }) => {
 
 const LoginPage = () => {
   const [search] = useSearchParams()
+  const navigate = useNavigate()
   const [form, setForm] = useState({ email: '', password: '', role: 'USER' })
   const [errors, setErrors] = useState({})
   const [status, setStatus] = useState(null)
@@ -81,6 +82,7 @@ const LoginPage = () => {
     try {
       const result = await handleLogin(form)
       setStatus({ type: 'success', message: result?.message || 'Login successful.' })
+      navigate('/welcome', { replace: true })
     } catch (err) {
       setStatus({ type: 'error', message: err.message || 'Unable to login right now.' })
     } finally {
