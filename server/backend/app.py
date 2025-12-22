@@ -10,9 +10,10 @@ Security highlights:
 """
 
 import os
+import traceback
 import hashlib
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import bcrypt
 import smtplib
 from email.message import EmailMessage
@@ -125,11 +126,14 @@ def hash_reset_token(raw: str) -> str:
 def create_reset_request(conn, user_id: int, ttl_minutes: int = 30) -> str:
   token = secrets.token_urlsafe(32)
   token_hash = hash_reset_token(token)
-  expires_at = datetime.utcnow() + timedelta(minutes=ttl_minutes)
+  now_utc = datetime.now(timezone.utc)
+  # Store naive UTC so DB compares apples-to-apples under UTC session time zone
+  created_at = now_utc.replace(tzinfo=None)
+  expires_at = (now_utc + timedelta(minutes=ttl_minutes)).replace(tzinfo=None)
   cur = conn.cursor()
   cur.execute(
-    "INSERT INTO password_resets (user_id, token_hash, expires_at) VALUES (%s, %s, %s)",
-    (user_id, token_hash, expires_at),
+    "INSERT INTO password_resets (user_id, token_hash, created_at, expires_at) VALUES (%s, %s, %s, %s)",
+    (user_id, token_hash, created_at, expires_at),
   )
   conn.commit()
   cur.close()
@@ -309,7 +313,7 @@ def reset_password():
       SELECT pr.id, pr.user_id, u.provider
       FROM password_resets pr
       JOIN users u ON u.id = pr.user_id
-      WHERE pr.token_hash=%s AND pr.used=0 AND pr.expires_at > NOW()
+      WHERE pr.token_hash=%s AND pr.used=0 AND pr.expires_at > UTC_TIMESTAMP()
       LIMIT 1
       """,
       (token_hash,),
@@ -320,21 +324,36 @@ def reset_password():
       return jsonify({"message": "Invalid or expired reset link."}), 400
 
     reset_id, user_id, provider = row
+    
+    # Close previous cursor to ensure clean state before transaction
+    cur.close()
+
     if provider != "password":
-      cur.close()
       return jsonify({"message": "Invalid or expired reset link."}), 400
 
     pw_hash = hash_password(password)
 
-    conn.start_transaction()
-    cur.execute("UPDATE users SET password_hash=%s WHERE id=%s", (pw_hash, user_id))
-    cur.execute("UPDATE password_resets SET used=1 WHERE id=%s", (reset_id,))
-    conn.commit()
-    cur.close()
+    try:
+      # Ends the implicit transaction started by the SELECT query
+      conn.commit()
+      
+      conn.start_transaction()
+      # Open new cursor for the transaction updates
+      cur = conn.cursor()
+      cur.execute("UPDATE users SET password_hash=%s WHERE id=%s", (pw_hash, user_id))
+      cur.execute("UPDATE password_resets SET used=1 WHERE id=%s", (reset_id,))
+      conn.commit()
+      cur.close()
 
-    return jsonify({"message": "Password updated successfully."}), 200
+      return jsonify({"message": "Password updated successfully."}), 200
+    except Exception:
+      conn.rollback()
+      with open("server_error.log", "w") as f:
+        traceback.print_exc(file=f)
+      return jsonify({"message": "Unable to reset password right now."}), 500
   except Exception:
-    conn.rollback()
+    with open("server_error.log", "w") as f:
+      traceback.print_exc(file=f)
     return jsonify({"message": "Unable to reset password right now."}), 500
   finally:
     conn.close()

@@ -33,6 +33,10 @@ pool = get_pool()
 
 
 def get_connection():
-	"""Get a pooled connection for request-scoped use."""
-	return pool.get_connection()
+	"""Get a pooled connection for request-scoped use and force UTC session time zone."""
+	conn = pool.get_connection()
+	cur = conn.cursor()
+	cur.execute("SET time_zone = '+00:00'")
+	cur.close()
+	return conn
 
