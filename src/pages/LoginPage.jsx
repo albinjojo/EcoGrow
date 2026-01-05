@@ -82,7 +82,7 @@ const LoginPage = () => {
     try {
       const result = await handleLogin(form)
       setStatus({ type: 'success', message: result?.message || 'Login successful.' })
-      navigate('/welcome', { replace: true })
+      navigate('/welcome')
     } catch (err) {
       setStatus({ type: 'error', message: err.message || 'Unable to login right now.' })
     } finally {

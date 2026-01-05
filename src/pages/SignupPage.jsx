@@ -47,7 +47,7 @@ const SignupPage = () => {
     try {
       const result = await handleSignup(form)
       setStatus({ type: 'success', message: result?.message || 'Signup successful.' })
-      navigate('/welcome', { replace: true })
+      navigate('/welcome')
     } catch (err) {
       setStatus({ type: 'error', message: err.message || 'Unable to signup right now.' })
     } finally {
