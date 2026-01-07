@@ -109,7 +109,7 @@ const SignupPage = () => {
       </button>
 
       <p className="footnote">
-        Already have an account? <Link to="/login">Log in</Link>
+        Already have an account? <Link to="/auth/login">Log in</Link>
       </p>
     </form>
   )

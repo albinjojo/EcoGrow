@@ -11,7 +11,7 @@ const LandingPage = () => {
       navigate(-1)
       return
     }
-    navigate('/login')
+    navigate('/auth/login')
   }
 
   return (

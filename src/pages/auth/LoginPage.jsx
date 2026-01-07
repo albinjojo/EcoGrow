@@ -138,7 +138,7 @@ const LoginPage = () => {
             </svg>
           }
         />
-        <Link className="inline-link" to="/forgot">
+        <Link className="inline-link" to="/auth/forgot">
           Forgot Password?
         </Link>
       </div>
@@ -164,7 +164,7 @@ const LoginPage = () => {
       </button>
 
       <p className="footnote">
-        Don’t have an account? <Link to="/signup">Sign Up</Link>
+        Don’t have an account? <Link to="/auth/signup">Sign Up</Link>
       </p>
     </form>
   )

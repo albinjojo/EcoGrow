@@ -63,7 +63,7 @@ const ForgotPasswordPage = () => {
       </button>
 
       <p className="footnote">
-        Remembered your password? <Link to="/login">Back to login</Link>
+        Remembered your password? <Link to="/auth/login">Back to login</Link>
       </p>
 
       <div className="email-placeholder">

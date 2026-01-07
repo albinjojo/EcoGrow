@@ -41,7 +41,7 @@ const ResetPasswordPage = () => {
     try {
       const result = await resetPassword({ token, password: form.password, confirmPassword: form.confirmPassword })
       setStatus({ type: 'success', message: result?.message || 'Password updated. Redirecting to login…' })
-      setTimeout(() => navigate('/login', { replace: true }), 1200)
+      setTimeout(() => navigate('/auth/login', { replace: true }), 1200)
     } catch (err) {
       setStatus({ type: 'error', message: err.message || 'Unable to reset password right now.' })
     } finally {
@@ -95,7 +95,7 @@ const ResetPasswordPage = () => {
       </button>
 
       <p className="footnote">
-        Remembered your password? <Link to="/login">Back to login</Link>
+        Remembered your password? <Link to="/auth/login">Back to login</Link>
       </p>
     </form>
   )
