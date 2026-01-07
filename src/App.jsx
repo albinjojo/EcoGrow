@@ -5,6 +5,13 @@ import SignupPage from './pages/auth/SignupPage'
 import LandingPage from './pages/LandingPage'
 import ResetPasswordPage from './pages/auth/ResetPasswordPage'
 import AuthLayout from './pages/auth/AuthLayout'
+import DashboardLayout from './pages/dashboard/DashboardLayout'
+import DashboardHome from './pages/dashboard/DashboardHome'
+import Sensors from './pages/dashboard/Sensors'
+import AIRiskPrediction from './pages/dashboard/AIRiskPrediction'
+import Alerts from './pages/dashboard/Alerts'
+import Reports from './pages/dashboard/Reports'
+import HistoricAnalysis from './pages/dashboard/HistoricAnalysis'
 
 function App() {
   return (
@@ -44,6 +51,14 @@ function App() {
           </AuthLayout>
         }
       />
+      <Route path="/dashboard" element={<DashboardLayout />}>
+        <Route index element={<DashboardHome />} />
+        <Route path="sensors" element={<Sensors />} />
+        <Route path="ai-risk" element={<AIRiskPrediction />} />
+        <Route path="alerts" element={<Alerts />} />
+        <Route path="reports" element={<Reports />} />
+        <Route path="history" element={<HistoricAnalysis />} />
+      </Route>
       <Route path="*" element={<Navigate to="/auth/login" replace />} />
     </Routes>
   )
