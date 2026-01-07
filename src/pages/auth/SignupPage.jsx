@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { handleSignup, startGoogleOAuth } from '../services/api'
-import { validateUserInput } from '../utils/validation'
+import { handleSignup, startGoogleOAuth } from '../../services/api'
+import { validateUserInput } from '../../utils/validation'
 
 const InputField = ({ label, name, type = 'text', placeholder, value, onChange, error }) => {
   return (

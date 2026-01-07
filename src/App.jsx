@@ -1,9 +1,9 @@
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
-import ForgotPasswordPage from './pages/ForgotPasswordPage'
-import LoginPage from './pages/LoginPage'
-import SignupPage from './pages/SignupPage'
+import ForgotPasswordPage from './pages/auth/ForgotPasswordPage'
+import LoginPage from './pages/auth/LoginPage'
+import SignupPage from './pages/auth/SignupPage'
 import LandingPage from './pages/LandingPage'
-import ResetPasswordPage from './pages/ResetPasswordPage'
+import ResetPasswordPage from './pages/auth/ResetPasswordPage'
 import heroImage from './assets/farm.png'
 import './App.css'
 

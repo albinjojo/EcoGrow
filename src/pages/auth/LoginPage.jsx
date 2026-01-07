@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { handleLogin, startGoogleOAuth } from '../services/api'
-import { validateUserInput } from '../utils/validation'
+import { handleLogin, startGoogleOAuth } from '../../services/api'
+import { validateUserInput } from '../../utils/validation'
 
 const InputField = ({
   label,

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { requestPasswordReset } from '../services/api'
-import { validateUserInput } from '../utils/validation'
+import { requestPasswordReset } from '../../services/api'
+import { validateUserInput } from '../../utils/validation'
 
 const ForgotPasswordPage = () => {
   const [email, setEmail] = useState('')
