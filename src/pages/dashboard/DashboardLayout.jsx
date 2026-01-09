@@ -1,5 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext'
 import './Dashboard.css'
+import icon from '../../assets/icon.png'
 
 const navSections = [
   {
@@ -22,13 +24,12 @@ const navSections = [
 ]
 
 const DashboardLayout = () => {
+  const { logout } = useAuth()
   return (
     <div className="dashboard-shell">
       <aside className="dashboard-sidebar">
         <div className="sidebar-brand">
-          <span className="brand-mark" aria-hidden>
-            *
-          </span>
+          <img src={icon} alt="EcoGrow" style={{ width: '40px', height: '40px', borderRadius: '8px' }} />
           <div>
             <p className="brand-title">EcoGrow</p>
             <p className="brand-sub">Control Center</p>
@@ -63,6 +64,25 @@ const DashboardLayout = () => {
             </div>
           ))}
         </nav>
+
+        <div style={{ marginTop: 'auto' }}>
+          <button
+            onClick={logout}
+            className="nav-link"
+            style={{
+              width: '100%',
+              justifyContent: 'flex-start',
+              border: 'none',
+              background: 'transparent',
+              cursor: 'pointer',
+              color: '#dc2626',
+              fontSize: '14px',
+              paddingLeft: '12px'
+            }}
+          >
+            Logout
+          </button>
+        </div>
       </aside>
 
       <div className="dashboard-main">
@@ -88,7 +108,7 @@ const DashboardLayout = () => {
           <Outlet />
         </main>
       </div>
-    </div>
+    </div >
   )
 }
 

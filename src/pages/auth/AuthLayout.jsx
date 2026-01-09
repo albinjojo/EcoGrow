@@ -1,19 +1,9 @@
 import { Link, useLocation } from 'react-router-dom'
 import heroImage from '../../assets/farm.png'
+import icon from '../../assets/icon.png'
 import './authpages.css'
 
-const LeafMark = () => (
-  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path
-      d="M15.5 2.5C10.5 2.5 7 5 7 9C7 12.5 9 14 10.5 15.5C12 17 13 18.5 13 18.5C13 18.5 14.5 16.5 16 14.5C17.5 12.5 18.5 10 18.5 7.5C18.5 5.5 17.5 2.5 15.5 2.5Z"
-      stroke="#7AAE24"
-      strokeWidth="1.2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    <path d="M11 9.5C11 9.5 12 7.5 15 6" stroke="#7AAE24" strokeWidth="1.2" strokeLinecap="round" />
-  </svg>
-)
+
 
 const AuthLayout = ({ children, heading }) => {
   const location = useLocation()
@@ -32,10 +22,10 @@ const AuthLayout = ({ children, heading }) => {
 
       <div className="form-side">
         <div className="admin-chip">
-          <Link to="/auth/login?role=ADMIN">Admin panel</Link>
+          <Link to="/auth/admin-login">Admin panel</Link>
         </div>
         <div className="brand-row">
-          <LeafMark />
+          <img src={icon} alt="EcoGrow" style={{ width: '32px', height: '32px' }} />
           <span className="brand-name">EcoGrow</span>
         </div>
         <div className="intro">

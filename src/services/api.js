@@ -61,3 +61,12 @@ export const resetPassword = async (payload) => {
   })
   return parseResponse(res)
 }
+
+export const fetchAllUsers = async () => {
+  const res = await fetch(`${API_BASE}/users`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+  })
+  return parseResponse(res)
+}

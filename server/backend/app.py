@@ -359,6 +359,49 @@ def reset_password():
     conn.close()
 
 
+@app.get("/api/users")
+def get_all_users():
+  """Fetch all users for admin panel. Requires admin role."""
+  # Check if user is authenticated and is admin
+  user_id = session.get("user_id")
+  user_role = session.get("role")
+  
+  if not user_id:
+    return jsonify({"message": "Unauthorized."}), 401
+  
+  if user_role != "ADMIN":
+    return jsonify({"message": "Forbidden. Admin access required."}), 403
+  
+  conn = get_connection()
+  try:
+    cur = conn.cursor()
+    cur.execute(
+      "SELECT id, email, role, provider, created_at FROM users ORDER BY created_at DESC",
+    )
+    rows = cur.fetchall()
+    cur.close()
+    
+    users = []
+    for row in rows:
+      user_id_db, email, role, provider, created_at = row
+      users.append({
+        "id": user_id_db,
+        "email": email,
+        "role": role,
+        "provider": provider,
+        "createdAt": created_at.isoformat() if created_at else None,
+        "status": "Active",  # Can be extended with last_login tracking
+      })
+    
+    return jsonify({"users": users, "total": len(users)}), 200
+  except Exception as e:
+    with open("server_error.log", "w") as f:
+      traceback.print_exc(file=f)
+    return jsonify({"message": "Unable to fetch users."}), 500
+  finally:
+    conn.close()
+
+
 @app.get("/health")
 def health():
   return jsonify({"status": "ok"})

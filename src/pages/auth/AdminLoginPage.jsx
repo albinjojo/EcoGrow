@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { handleLogin, startGoogleOAuth } from '../../services/api'
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { handleLogin } from '../../services/api'
 import { validateUserInput } from '../../utils/validation'
 import { useAuth } from '../../context/AuthContext'
 
@@ -47,23 +47,13 @@ const StatusText = ({ status }) => {
   return <p className={`status-text ${tone}`}>{status.message}</p>
 }
 
-const LoginPage = () => {
-  const [search] = useSearchParams()
+const AdminLoginPage = () => {
   const navigate = useNavigate()
   const { login } = useAuth()
-  const [form, setForm] = useState({ email: '', password: '', role: 'USER' })
+  const [form, setForm] = useState({ email: '', password: '', role: 'ADMIN' })
   const [errors, setErrors] = useState({})
   const [status, setStatus] = useState(null)
   const [submitting, setSubmitting] = useState(false)
-
-  const adminMode = useMemo(
-    () => search.get('role')?.toUpperCase() === 'ADMIN',
-    [search],
-  )
-
-  useEffect(() => {
-    setForm((prev) => ({ ...prev, role: adminMode ? 'ADMIN' : 'USER' }))
-  }, [adminMode])
 
   const onInput = (e) => {
     const { name, value } = e.target
@@ -83,21 +73,23 @@ const LoginPage = () => {
     setSubmitting(true)
     try {
       const result = await handleLogin(form)
-      setStatus({ type: 'success', message: result?.message || 'Login successful.' })
+      setStatus({ type: 'success', message: result?.message || 'Admin login successful.' })
       
-      // Store user info in context with role
+      // Store user info in context with ADMIN role
       login({
         id: result.id,
         email: form.email,
-        role: form.role,
+        role: 'ADMIN',
         ...result,
       })
 
-      // Redirect based on role
-      const redirectPath = form.role === 'ADMIN' ? '/admin' : '/dashboard'
-      navigate(redirectPath, { replace: true })
+      // Redirect to admin panel
+      navigate('/admin', { replace: true })
     } catch (err) {
-      setStatus({ type: 'error', message: err.message || 'Unable to login right now.' })
+      setStatus({
+        type: 'error',
+        message: err.message || 'Unable to login as admin right now.',
+      })
     } finally {
       setSubmitting(false)
     }
@@ -106,14 +98,15 @@ const LoginPage = () => {
   return (
     <form className="auth-form" onSubmit={onSubmit} noValidate>
       <div className="form-heading">
-        <h1>Login.</h1>
+        <h1>Admin Login.</h1>
+        <p className="admin-subtitle">Access your admin dashboard</p>
       </div>
 
       <InputField
         label="Email Address"
         name="email"
         type="email"
-        placeholder="farmer@ecogrow.com"
+        placeholder="admin@ecogrow.com"
         value={form.email}
         onChange={onInput}
         error={errors.email}
@@ -159,28 +152,16 @@ const LoginPage = () => {
       <StatusText status={status} />
 
       <button className="primary-btn" type="submit" disabled={submitting}>
-        {submitting ? 'Signing in…' : 'Sign In'}
+        {submitting ? 'Signing in…' : 'Sign In as Admin'}
       </button>
 
       <div className="divider" role="separator" aria-hidden />
 
-      <button className="ghost-btn" type="button" onClick={startGoogleOAuth}>
-        <span className="google-icon" aria-hidden>
-          <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M21 11.2308C21 10.3692 20.9154 9.53846 20.7569 8.73077H11.23V13.1308H16.7538C16.5154 14.4154 15.7615 15.5 14.6769 16.2385V19.0231H17.8615C19.7692 17.2692 21 14.5077 21 11.2308Z" fill="#4285F4" />
-            <path d="M11.23 21.6923C13.9692 21.6923 16.2615 20.7923 17.8615 19.0231L14.6769 16.2385C13.8077 16.8231 12.6385 17.1923 11.23 17.1923C8.58462 17.1923 6.35385 15.4231 5.56154 12.9923H2.28462V15.8538C3.89231 19.3154 7.29231 21.6923 11.23 21.6923Z" fill="#34A853" />
-            <path d="M5.56154 12.9923C5.36154 12.4077 5.24615 11.7846 5.24615 11.1538C5.24615 10.5231 5.36154 9.9 5.56154 9.31538V6.45385H2.28462C1.61538 7.86154 1.23077 9.46154 1.23077 11.1538C1.23077 12.8462 1.61538 14.4462 2.28462 15.8538L5.56154 12.9923Z" fill="#FBBC05" />
-            <path d="M11.23 5.11538C12.7692 5.11538 14.1308 5.64615 15.1769 6.64615L18.9385 2.88462C16.2538 0.384615 13.9615 -2.38419e-07 11.23 -2.38419e-07C7.29231 -2.38419e-07 3.89231 2.37692 2.28462 5.84615L5.56154 8.70769C6.35385 6.27692 8.58462 5.11538 11.23 5.11538Z" fill="#EA4335" />
-          </svg>
-        </span>
-        Login with Google
-      </button>
-
       <p className="footnote">
-        Don’t have an account? <Link to="/auth/signup">Sign Up</Link>
+        <Link to="/auth/login">Back to user login</Link>
       </p>
     </form>
   )
 }
 
-export default LoginPage
+export default AdminLoginPage
