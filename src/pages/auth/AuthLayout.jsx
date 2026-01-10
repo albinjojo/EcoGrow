@@ -3,8 +3,6 @@ import heroImage from '../../assets/farm.png'
 import icon from '../../assets/icon.png'
 import './authpages.css'
 
-
-
 const AuthLayout = ({ children, heading }) => {
   const location = useLocation()
   const isLogin =
@@ -24,15 +22,18 @@ const AuthLayout = ({ children, heading }) => {
         <div className="admin-chip">
           <Link to="/auth/admin-login">Admin panel</Link>
         </div>
-        <div className="brand-row">
-          <img src={icon} alt="EcoGrow" style={{ width: '32px', height: '32px' }} />
-          <span className="brand-name">EcoGrow</span>
+
+        <div className="auth-card">
+          <div className="brand-row">
+            <img src={icon} alt="EcoGrow" style={{ width: '32px', height: '32px' }} />
+            <span className="brand-name">EcoGrow</span>
+          </div>
+          <div className="intro">
+            <h2>{heading || (isLogin ? 'Welcome back' : 'Join EcoGrow')}</h2>
+            <p className="sub-text">Please enter your details to continue.</p>
+          </div>
+          {children}
         </div>
-        <div className="intro">
-          <h2>{heading || (isLogin ? 'Welcome back' : 'Join EcoGrow')}</h2>
-          <p className="sub-text">Please enter your details to continue.</p>
-        </div>
-        {children}
       </div>
     </div>
   )

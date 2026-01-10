@@ -84,7 +84,7 @@ const LoginPage = () => {
     try {
       const result = await handleLogin(form)
       setStatus({ type: 'success', message: result?.message || 'Login successful.' })
-      
+
       // Store user info in context with role
       login({
         id: result.id,
@@ -106,7 +106,7 @@ const LoginPage = () => {
   return (
     <form className="auth-form" onSubmit={onSubmit} noValidate>
       <div className="form-heading">
-        <h1>Login.</h1>
+        {/* Header managed by AuthLayout */}
       </div>
 
       <InputField

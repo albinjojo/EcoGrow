@@ -25,6 +25,7 @@ from google_auth_oauthlib.flow import Flow
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 from db_connect import get_connection
+from user_account import account_bp
 from validators import validate_email, validate_password
 
 load_dotenv()
@@ -37,12 +38,13 @@ GOOGLE_SCOPES = [
 ]
 
 def get_cors_origins():
-  raw = os.environ.get("CORS_ORIGIN", "*")
+  raw = os.environ.get("CORS_ORIGIN", "http://localhost:5173")
   # Allow comma-separated origins, trim whitespace
-  return [o.strip() for o in raw.split(",") if o.strip()] or ["*"]
+  return [o.strip() for o in raw.split(",") if o.strip()] or ["http://localhost:5173"]
 
 
 app = Flask(__name__)
+app.register_blueprint(account_bp)
 CORS(app, origins=get_cors_origins(), supports_credentials=True)
 app.secret_key = os.environ.get("FLASK_SECRET", "dev-secret-change")
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
@@ -402,6 +404,8 @@ def get_all_users():
     conn.close()
 
 
+
+
 @app.get("/health")
 def health():
   return jsonify({"status": "ok"})
@@ -440,7 +444,12 @@ def google_callback():
 
   conn = get_connection()
   try:
-    upsert_google_user(conn, email)
+    user_id, role = upsert_google_user(conn, email)
+    
+    # establish session
+    session["user_id"] = user_id
+    session["email"] = email
+    session["role"] = role
   finally:
     conn.close()
 

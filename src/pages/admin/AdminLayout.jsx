@@ -50,7 +50,7 @@ const AdminLayout = () => {
       {/* Sidebar Navigation */}
       <aside className="admin-sidebar">
         <div className="sidebar-brand">
-          <img src={icon} alt="EcoGrow" style={{ width: '32px', height: '32px' }} />
+          <img src={icon} alt="EcoGrow" style={{ width: '24px', height: '24px' }} />
           <div>
             <p className="brand-title">EcoGrow</p>
             <p className="brand-sub">Admin Panel</p>
@@ -71,7 +71,7 @@ const AdminLayout = () => {
                         `nav-link ${isActive ? 'nav-link-active' : ''}`
                       }
                     >
-                      <span className="nav-icon">{link.icon}</span>
+                      {/* <span className="nav-icon">{link.icon}</span> */}
                       <span className="nav-label">{link.label}</span>
                     </NavLink>
                   </li>
@@ -93,8 +93,10 @@ const AdminLayout = () => {
         {/* Top Bar */}
         <header className="admin-topbar">
           <div className="topbar-left">
-            <p className="breadcrumb">Admin / Dashboard</p>
-            <h1>Administration Panel</h1>
+            <h1>
+              <span style={{ color: 'var(--c-text-tertiary)' }}>///</span>
+              Administration
+            </h1>
           </div>
 
           <div className="topbar-right">
@@ -102,7 +104,7 @@ const AdminLayout = () => {
               <div className="profile-avatar">{user?.email?.[0].toUpperCase() || 'A'}</div>
               <div className="profile-info">
                 <p className="profile-name">{user?.email || 'Administrator'}</p>
-                <p className="profile-role">Admin</p>
+                <p className="profile-role">System Admin</p>
               </div>
             </div>
           </div>

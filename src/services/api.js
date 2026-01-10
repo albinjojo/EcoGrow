@@ -1,72 +1,79 @@
-// Default to Flask backend (http://localhost:5000/api). Override with VITE_API_URL in .env.local.
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
-const parseResponse = async (response) => {
-  const data = await response.json().catch(() => ({}))
-  if (!response.ok) {
-    const message = data?.message || 'Unexpected server error.'
-    throw new Error(message)
+const API_BASE = 'http://localhost:5000/api'
+
+// Helper for requests
+const request = async (endpoint, options = {}) => {
+  const token = localStorage.getItem('token')
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers,
   }
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+
+  const response = await fetch(`${API_BASE}${endpoint}`, {
+    ...options,
+    headers,
+    credentials: 'include', // Important for sending session cookies
+  })
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data.message || 'API request failed')
+  }
+
   return data
 }
 
-export const handleLogin = async (payload) => {
-  const res = await fetch(`${API_BASE}/login`, {
+// Auth API
+export const handleLogin = async (credentials) => {
+  return request('/login', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify(payload),
+    body: JSON.stringify(credentials),
   })
-  return parseResponse(res)
 }
 
-export const handleSignup = async (payload) => {
-  const res = await fetch(`${API_BASE}/signup`, {
+export const handleSignup = async (userData) => {
+  return request('/signup', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify(payload),
+    body: JSON.stringify(userData),
   })
-  return parseResponse(res)
 }
 
-export const handleGoogleAuth = async (token) => {
-  const res = await fetch(`${API_BASE}/google`, {
+export const requestPasswordReset = async (email) => {
+  return request('/forgot-password', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ token }),
+    body: JSON.stringify({ email }),
   })
-  return parseResponse(res)
+}
+
+export const resetPassword = async ({ token, password }) => {
+  return request('/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ token, password }),
+  })
 }
 
 export const startGoogleOAuth = () => {
   window.location.href = `${API_BASE}/google/start`
 }
 
-export const requestPasswordReset = async (email) => {
-  const res = await fetch(`${API_BASE}/forgot-password`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email }),
-  })
-  return parseResponse(res)
+// User API
+export const getAccountProfile = async () => {
+  return await request('/account/profile')
 }
 
-export const resetPassword = async (payload) => {
-  const res = await fetch(`${API_BASE}/reset-password`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+export const updateAccountProfile = async (profileData) => {
+  return request('/account/profile', {
+    method: 'POST', // user_account.py uses POST for upsert
+    body: JSON.stringify(profileData),
   })
-  return parseResponse(res)
 }
 
+// Admin API
 export const fetchAllUsers = async () => {
-  const res = await fetch(`${API_BASE}/users`, {
-    method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-  })
-  return parseResponse(res)
+  return request('/users')
 }

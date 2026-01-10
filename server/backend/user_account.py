@@ -32,7 +32,7 @@ def get_profile():
     row = cur.fetchone()
     cur.close()
     profile = _profile_row_to_dict(row, fallback_name)
-    return jsonify({"email": email, "role": role, "profile": profile}), 200
+    return jsonify({"id": user_id, "email": email, "role": role, "profile": profile}), 200
   finally:
     conn.close()
 

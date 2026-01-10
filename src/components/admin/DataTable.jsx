@@ -5,7 +5,7 @@
 const DataTable = ({ columns, rows, actions }) => {
   return (
     <div className="data-table-container">
-      <table className="data-table">
+      <table className="simple-table">
         <thead>
           <tr>
             {columns.map((col) => (

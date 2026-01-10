@@ -29,10 +29,10 @@ const DashboardLayout = () => {
     <div className="dashboard-shell">
       <aside className="dashboard-sidebar">
         <div className="sidebar-brand">
-          <img src={icon} alt="EcoGrow" style={{ width: '40px', height: '40px', borderRadius: '8px' }} />
+          <div className="brand-mark">E</div>
           <div>
             <p className="brand-title">EcoGrow</p>
-            <p className="brand-sub">Control Center</p>
+            <p className="nav-section-title" style={{ margin: 0 }}>Control Center</p>
           </div>
         </div>
 
@@ -54,7 +54,7 @@ const DashboardLayout = () => {
                         {link.label}
                       </NavLink>
                     ) : (
-                      <span className="nav-link nav-link-disabled" aria-disabled="true">
+                      <span className="nav-link" style={{ opacity: 0.5, cursor: 'not-allowed' }}>
                         {link.label}
                       </span>
                     )}
@@ -75,9 +75,7 @@ const DashboardLayout = () => {
               border: 'none',
               background: 'transparent',
               cursor: 'pointer',
-              color: '#dc2626',
-              fontSize: '14px',
-              paddingLeft: '12px'
+              color: '#d14343'
             }}
           >
             Logout
@@ -93,7 +91,7 @@ const DashboardLayout = () => {
           </div>
           <div className="topbar-actions">
             <input className="search-input" type="search" placeholder="Search sensors..." aria-label="Search" />
-            <button className="ghost-action" type="button">Refresh</button>
+            <button className="btn-ghost" type="button">Refresh</button>
             <div className="user-chip" aria-label="Admin user">
               <div className="user-avatar">A</div>
               <div>

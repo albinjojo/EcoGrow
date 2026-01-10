@@ -1,22 +1,40 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap');
 
 :root {
-  font-family: 'Poppins', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-  color: #1f1f1f;
-  background-color: #f7fbf5;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  --green-strong: #7aae24;
-  --green-soft: #9bbf3c;
-  --green-pale: #e9f4de;
-  --neutral-ink: #131313;
-  --neutral-muted: #6d6d6d;
-  --surface: #ffffff;
-  --border: #dfe8d4;
+  /* Font Family */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Palette - Industrial Nature */
+  --c-bg-app: #f2f4f1;
+  /* Light concrete/clay */
+  --c-surface: #ffffff;
+  --c-surface-muted: #f7f9f7;
+
+  --c-border-strong: #a0a6a0;
+  /* Structural steel */
+  --c-border-subtle: #daddd9;
+
+  --c-text-primary: #1a1d1a;
+  --c-text-secondary: #5a605a;
+  --c-text-tertiary: #8a908a;
+
+  --c-accent-primary: #2d5a27;
+  /* Deep industrial green */
+  --c-accent-hover: #1e3e1a;
+
+  --c-status-safe: #2d5a27;
+  --c-status-safe-bg: #e6f0e4;
+  --c-status-warn: #8a6d0b;
+  --c-status-warn-bg: #fbf5e0;
+  --c-status-danger: #8a1c1c;
+  --c-status-danger-bg: #fbeaea;
+
+  /* Spacing & Layout */
+  --grid-gap: 16px;
+  --radius-sm: 2px;
+  /* Sharp, engineered corners */
+  --radius-md: 4px;
 }
 
 * {
@@ -25,20 +43,22 @@
 
 body {
   margin: 0;
-  background: #f7fbf5;
-  color: var(--neutral-ink);
+  font-family: var(--font-sans);
+  background: var(--c-bg-app);
+  color: var(--c-text-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
 }
 
 a {
-  color: var(--green-strong);
+  color: var(--c-accent-primary);
   text-decoration: none;
   font-weight: 600;
 }
 
 a:hover {
   text-decoration: underline;
-}
-
-button {
-  font-family: inherit;
 }

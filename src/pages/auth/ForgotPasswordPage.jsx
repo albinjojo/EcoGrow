@@ -31,8 +31,7 @@ const ForgotPasswordPage = () => {
   return (
     <form className="auth-form" onSubmit={onSubmit} noValidate>
       <div className="form-heading">
-        <h1>Forgot Password</h1>
-        <p className="sub-text">Enter your account email to receive reset instructions.</p>
+        {/* Header managed by AuthLayout */}
       </div>
 
       <div className="form-field">

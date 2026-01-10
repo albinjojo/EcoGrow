@@ -3,7 +3,7 @@ import ForgotPasswordPage from './pages/auth/ForgotPasswordPage'
 import LoginPage from './pages/auth/LoginPage'
 import SignupPage from './pages/auth/SignupPage'
 import AdminLoginPage from './pages/auth/AdminLoginPage'
-import LandingPage from './pages/LandingPage'
+import GoogleCallback from './pages/auth/GoogleCallback'
 import ResetPasswordPage from './pages/auth/ResetPasswordPage'
 import AuthLayout from './pages/auth/AuthLayout'
 import DashboardLayout from './pages/dashboard/DashboardLayout'
@@ -56,7 +56,7 @@ function App() {
             </AuthLayout>
           }
         />
-        <Route path="/welcome" element={<LandingPage />} />
+        <Route path="/welcome" element={<GoogleCallback />} />
         <Route path="/auth/reset"
           element={
             <AuthLayout heading="Create a new password">

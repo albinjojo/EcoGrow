@@ -28,7 +28,7 @@ const AdminDashboard = () => {
       try {
         const response = await fetchAllUsers()
         const users = response.users || []
-        
+
         // Update total users count
         setStats((prev) => ({
           ...prev,
@@ -73,7 +73,7 @@ const AdminDashboard = () => {
         <div className="section-header">
           <h2>System Overview</h2>
           <button className="secondary-btn" onClick={handleRefresh} disabled={loading}>
-            🔄 Refresh
+            REFRESH
           </button>
         </div>
 
@@ -82,7 +82,6 @@ const AdminDashboard = () => {
             title="Total Users"
             value={loading ? '...' : stats.totalUsers}
             subtitle="Active farmer accounts"
-            icon="👥"
             trend={{ direction: 'up', text: '+5 this month' }}
             variant="users"
           />
@@ -90,7 +89,6 @@ const AdminDashboard = () => {
             title="Total Devices"
             value={stats.totalDevices}
             subtitle="IoT sensors & hardware"
-            icon="📱"
             trend={{ direction: 'up', text: '+2 this month' }}
             variant="devices"
           />
@@ -98,7 +96,6 @@ const AdminDashboard = () => {
             title="Active Alerts"
             value={stats.activeAlerts}
             subtitle="Require attention"
-            icon="🔔"
             trend={{ direction: 'down', text: '-1 from yesterday' }}
             variant="alerts"
           />
@@ -106,7 +103,6 @@ const AdminDashboard = () => {
             title="System Health"
             value={`${stats.systemHealth}%`}
             subtitle="Overall uptime"
-            icon="💚"
             variant="health"
           />
         </div>

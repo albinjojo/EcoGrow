@@ -74,7 +74,7 @@ const AdminLoginPage = () => {
     try {
       const result = await handleLogin(form)
       setStatus({ type: 'success', message: result?.message || 'Admin login successful.' })
-      
+
       // Store user info in context with ADMIN role
       login({
         id: result.id,
@@ -98,8 +98,7 @@ const AdminLoginPage = () => {
   return (
     <form className="auth-form" onSubmit={onSubmit} noValidate>
       <div className="form-heading">
-        <h1>Admin Login.</h1>
-        <p className="admin-subtitle">Access your admin dashboard</p>
+        {/* Header managed by AuthLayout */}
       </div>
 
       <InputField

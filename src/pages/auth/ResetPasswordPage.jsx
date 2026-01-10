@@ -52,8 +52,7 @@ const ResetPasswordPage = () => {
   return (
     <form className="auth-form" onSubmit={onSubmit} noValidate>
       <div className="form-heading">
-        <h1>Set a new password</h1>
-        <p className="sub-text">Enter a strong password you will remember.</p>
+        {/* Header managed by AuthLayout */}
       </div>
 
       <div className="form-field">
