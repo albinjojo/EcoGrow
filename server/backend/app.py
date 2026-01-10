@@ -453,9 +453,9 @@ def google_callback():
   finally:
     conn.close()
 
-  # Redirect to frontend landing page after successful Google auth
+  # Redirect to frontend dashboard after successful Google auth
   origin = os.environ.get("CORS_ORIGIN", "http://localhost:5173").split(",")[0].strip()
-  target = f"{origin}/welcome"
+  target = f"{origin}/dashboard"
   return redirect(target)
 
 

@@ -13,7 +13,7 @@ const GoogleCallback = () => {
         if (checkedRef.current) return
         checkedRef.current = true
 
-        const verifySession = async () => {
+        const fetchProfileAndRedirect = async () => {
             try {
                 const data = await getAccountProfile()
                 if (data && data.email) {
@@ -24,21 +24,20 @@ const GoogleCallback = () => {
                         ...data.profile,
                     })
 
-                    // Redirect based on role
+                    // Navigate to dashboard for regular users, admin panel for admins
                     const target = data.role === 'ADMIN' ? '/admin' : '/dashboard'
                     navigate(target, { replace: true })
                 } else {
-                    // No session found
-                    console.error('Session verify returned no data')
-                    setStatus('Session check failed: No user data returned. Please try logging in again.')
+                    console.error('No user data returned from profile API')
+                    setStatus('Login failed: Unable to retrieve user information.')
                 }
             } catch (error) {
-                console.error('Session verification failed', error)
-                setStatus(`Login failed: ${error.message || 'Unknown error'}`)
+                console.error('Failed to fetch user profile:', error)
+                setStatus(`Login failed: ${error.message || 'Unauthorized'}`)
             }
         }
 
-        verifySession()
+        fetchProfileAndRedirect()
     }, [login, navigate])
 
     if (status) {
