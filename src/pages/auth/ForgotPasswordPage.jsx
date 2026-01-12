@@ -66,7 +66,7 @@ const ForgotPasswordPage = () => {
       </p>
 
       <div className="email-placeholder">
-        {/* TODO: Integrate transactional email provider for reset links. Place SMTP/API invocation here. */}
+        {/*API invocation here. */}
       </div>
     </form>
   )
