@@ -2,6 +2,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useEffect, useState } from 'react'
 import { getAccountProfile } from '../../services/api'
+import CompleteProfileModal from '../../components/CompleteProfileModal'
 import './Dashboard.css'
 import icon from '../../assets/icon.png'
 
@@ -32,24 +33,46 @@ const DashboardLayout = () => {
     email: '',
     role: 'USER'
   })
+  const [showCompleteProfile, setShowCompleteProfile] = useState(false)
+
+  const loadProfile = async () => {
+    try {
+      const data = await getAccountProfile()
+      const profile = data.profile || {}
+
+      setUserProfile({
+        name: profile.full_name || data.email?.split('@')[0] || 'User',
+        email: data.email || '',
+        role: data.role || 'USER'
+      })
+
+      // Check if profile is incomplete
+      // Consider it incomplete if full_name, phone_number, or country is missing
+      const isProfileIncomplete = !profile.full_name || !profile.phone_number || !profile.country
+      if (isProfileIncomplete) {
+        setShowCompleteProfile(true)
+      }
+    } catch (err) {
+      console.error('Failed to load user profile:', err)
+    }
+  }
 
   useEffect(() => {
-    const loadProfile = async () => {
-      try {
-        const data = await getAccountProfile()
-        setUserProfile({
-          name: data.profile?.name || data.email?.split('@')[0] || 'User',
-          email: data.email || '',
-          role: data.role || 'USER'
-        })
-      } catch (err) {
-        console.error('Failed to load user profile:', err)
-      }
-    }
     loadProfile()
   }, [])
+
+  const handleProfileComplete = () => {
+    loadProfile() // Reload to get updated name etc.
+  }
+
   return (
     <div className="dashboard-shell">
+      <CompleteProfileModal
+        isOpen={showCompleteProfile}
+        onClose={() => setShowCompleteProfile(false)}
+        onComplete={handleProfileComplete}
+      />
+
       <aside className="dashboard-sidebar">
         <div className="sidebar-brand">
           <div className="brand-mark">E</div>
