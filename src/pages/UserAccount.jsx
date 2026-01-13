@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import './dashboard/Dashboard.css'
 import { getAccountProfile, updateAccountProfile } from '../services/api'
 
-const initialState = { name: '', phone: '', organization: '' }
+const initialState = { email: '', name: '', phone: '', organization: '' }
 
 const UserAccount = () => {
   const [form, setForm] = useState(initialState)
@@ -13,6 +13,7 @@ const UserAccount = () => {
       try {
         const res = await getAccountProfile()
         setForm({
+          email: res?.email || '',
           name: res?.profile?.name || '',
           phone: res?.profile?.phone || '',
           organization: res?.profile?.organization || '',
@@ -50,6 +51,10 @@ const UserAccount = () => {
 
       <form className="account-form" onSubmit={onSubmit}>
         <div className="form-grid">
+          <label className="form-field">
+            <span>Email</span>
+            <input name="email" value={form.email} disabled placeholder="Your email address" style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed' }} />
+          </label>
           <label className="form-field">
             <span>Name</span>
             <input name="name" value={form.name} onChange={onChange} placeholder="Your full name" />

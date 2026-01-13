@@ -13,6 +13,7 @@ import AIRiskPrediction from './pages/dashboard/AIRiskPrediction'
 import Alerts from './pages/dashboard/Alerts'
 import Reports from './pages/dashboard/Reports'
 import HistoricAnalysis from './pages/dashboard/HistoricAnalysis'
+import UserAccount from './pages/UserAccount'
 import AdminLayout from './pages/admin/AdminLayout'
 import AdminDashboard from './pages/admin/AdminDashboard'
 import UserManagement from './pages/admin/UserManagement'
@@ -80,6 +81,7 @@ function App() {
           <Route path="alerts" element={<Alerts />} />
           <Route path="reports" element={<Reports />} />
           <Route path="history" element={<HistoricAnalysis />} />
+          <Route path="account" element={<UserAccount />} />
         </Route>
 
         {/* Admin Panel - Protected for ADMIN role */}

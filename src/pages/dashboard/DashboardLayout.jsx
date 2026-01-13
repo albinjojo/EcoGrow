@@ -1,5 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { useEffect, useState } from 'react'
+import { getAccountProfile } from '../../services/api'
 import './Dashboard.css'
 import icon from '../../assets/icon.png'
 
@@ -25,6 +27,27 @@ const navSections = [
 
 const DashboardLayout = () => {
   const { logout } = useAuth()
+  const [userProfile, setUserProfile] = useState({
+    name: 'User',
+    email: '',
+    role: 'USER'
+  })
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const data = await getAccountProfile()
+        setUserProfile({
+          name: data.profile?.name || data.email?.split('@')[0] || 'User',
+          email: data.email || '',
+          role: data.role || 'USER'
+        })
+      } catch (err) {
+        console.error('Failed to load user profile:', err)
+      }
+    }
+    loadProfile()
+  }, [])
   return (
     <div className="dashboard-shell">
       <aside className="dashboard-sidebar">
@@ -92,13 +115,13 @@ const DashboardLayout = () => {
           <div className="topbar-actions">
             <input className="search-input" type="search" placeholder="Search sensors..." aria-label="Search" />
             <button className="btn-ghost" type="button">Refresh</button>
-            <div className="user-chip" aria-label="Admin user">
-              <div className="user-avatar">A</div>
+            <NavLink to="/dashboard/account" className="user-chip" aria-label={`${userProfile.name} - ${userProfile.role}`} style={{ textDecoration: 'none', cursor: 'pointer' }}>
+              <div className="user-avatar">{userProfile.name.charAt(0).toUpperCase()}</div>
               <div>
-                <p className="user-name">Admin</p>
-                <p className="user-role">Administrator</p>
+                <p className="user-name">{userProfile.name}</p>
+                <p className="user-role">{userProfile.role === 'ADMIN' ? 'Administrator' : 'User'}</p>
               </div>
-            </div>
+            </NavLink>
           </div>
         </header>
 
