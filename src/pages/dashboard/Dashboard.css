@@ -451,3 +451,107 @@ p {
     grid-column: 1 / -1;
   }
 }
+
+/* --- Forms & Inputs --- */
+.form-section {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border-strong);
+  padding: 24px;
+}
+
+.form-header {
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--c-border-subtle);
+}
+
+.form-header h2 {
+  font-size: 18px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--c-text-primary);
+  letter-spacing: -0.5px;
+}
+
+.form-header p {
+  font-size: 13px;
+  color: var(--c-text-secondary);
+  margin-top: 4px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 24px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group label {
+  font-size: 11px;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--c-text-secondary);
+  letter-spacing: 0.5px;
+}
+
+.form-input {
+  background: var(--c-surface-muted);
+  border: 1px solid var(--c-border-subtle);
+  padding: 10px 12px;
+  font-size: 14px;
+  border-radius: var(--radius-sm);
+  color: var(--c-text-primary);
+  transition: all 0.2s;
+  font-family: var(--font-mono);
+  width: 100%;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--c-accent-primary);
+  background: var(--c-surface);
+  box-shadow: 0 0 0 1px var(--c-accent-primary);
+}
+
+.form-input:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  background: #eaeaec;
+}
+
+.form-actions {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--c-border-subtle);
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.btn-primary {
+  background: var(--c-accent-primary);
+  color: white;
+  border: 1px solid #1e3e1a;
+  padding: 10px 24px;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--c-accent-hover);
+  transform: translateY(-1px);
+}
+
+.btn-primary:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
