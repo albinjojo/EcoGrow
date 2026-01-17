@@ -555,3 +555,98 @@ p {
   opacity: 0.7;
   cursor: wait;
 }
+
+/* --- Sensors List --- */
+.sensor-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.sensor-card {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border-strong);
+  padding: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: all 0.2s;
+  border-radius: var(--radius-sm);
+}
+
+.sensor-card:hover {
+  border-color: var(--c-accent-primary);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.sensor-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.sensor-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--c-text-primary);
+  text-transform: uppercase;
+}
+
+.sensor-status {
+  font-size: 11px;
+  color: var(--c-text-tertiary);
+  margin-top: 2px;
+}
+
+/* --- Toggle Switch --- */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 20px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--c-surface-muted);
+  border: 1px solid var(--c-border-strong);
+  transition: .4s;
+  border-radius: 20px;
+  /* Rounded for toggle */
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 2px;
+  bottom: 2px;
+  background-color: var(--c-text-tertiary);
+  transition: .4s;
+  border-radius: 50%;
+}
+
+input:checked+.slider {
+  background-color: var(--c-accent-primary);
+  border-color: var(--c-accent-hover);
+}
+
+input:checked+.slider:before {
+  transform: translateX(20px);
+  background-color: white;
+}
+
+input:focus+.slider {
+  box-shadow: 0 0 1px var(--c-accent-primary);
+}
