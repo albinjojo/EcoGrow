@@ -22,23 +22,7 @@ from db_connect import get_connection
 
 def bootstrap_first_admin(conn):
     """
-    Insert the first admin user into the users table if no admin exists.
-    
-    This is a one-time bootstrap function that:
-    1. Checks if an admin user already exists
-    2. If not, hashes the password using bcrypt
-    3. Inserts the admin record into the users table
-    
-    Args:
-        conn: Database connection from db_connect.get_connection()
-    
-    Returns:
-        dict: Status message with success/warning/error information
-    
-    Security:
-        - Password is hashed with bcrypt before insertion
-        - Only the hash is stored in the database
-        - Uses the configured bcrypt rounds from environment
+    heheeeeeeeeeeee
     """
     ADMIN_EMAIL = "admin@gmail.com"
     ADMIN_PASSWORD = "admin@123"
