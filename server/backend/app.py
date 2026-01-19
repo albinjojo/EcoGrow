@@ -26,6 +26,7 @@ from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 from db_connect import get_connection
 from user_account import account_bp
+from ai_service import ai_bp
 from validators import validate_email, validate_password
 
 load_dotenv()
@@ -45,6 +46,7 @@ def get_cors_origins():
 
 app = Flask(__name__)
 app.register_blueprint(account_bp)
+app.register_blueprint(ai_bp)
 CORS(app, origins=get_cors_origins(), supports_credentials=True)
 app.secret_key = os.environ.get("FLASK_SECRET", "dev-secret-change")
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
