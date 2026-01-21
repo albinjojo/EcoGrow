@@ -4,7 +4,7 @@ const Alerts = () => {
   return (
     <div className="dash-page">
       <div className="page-header">
-        <p className="eyebrow">Notifications</p>
+        <p className="eyebrow">Notifications page </p>
         <h2>Alerts</h2>
       </div>
       <div className="placeholder-card">
