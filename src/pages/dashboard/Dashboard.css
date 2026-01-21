@@ -430,6 +430,14 @@ p {
   font-size: 14px;
 }
 
+.alert-icon.critical {
+  color: var(--c-status-danger);
+}
+
+.alert-icon.info {
+  color: var(--c-accent-primary);
+}
+
 .alert-content p {
   font-size: 12px;
   font-weight: 600;
