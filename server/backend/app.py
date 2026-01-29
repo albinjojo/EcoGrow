@@ -27,7 +27,9 @@ from google.auth.transport import requests as google_requests
 from db_connect import get_connection
 from user_account import account_bp
 from ai_service import ai_bp
-from validators import validate_email, validate_password
+
+from flask_socketio import SocketIO
+from mqtt_service import start_mqtt_client, set_socketio
 
 load_dotenv()
 
@@ -47,10 +49,27 @@ def get_cors_origins():
 app = Flask(__name__)
 app.register_blueprint(account_bp)
 app.register_blueprint(ai_bp)
-CORS(app, origins=get_cors_origins(), supports_credentials=True)
+# CORS(app, origins=get_cors_origins(), supports_credentials=True) # SocketIO handles its own CORS usually, but we keep this for HTTP
+CORS(app, supports_credentials=True) # Simplified for now, or keep explicit
+
 app.secret_key = os.environ.get("FLASK_SECRET", "dev-secret-change")
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = False
+
+# Initialize SocketIO
+socketio = SocketIO(app, cors_allowed_origins="*") # Allow all for dev, restrict in prod
+set_socketio(socketio)
+
+# Start MQTT Service in Background
+# Use a flag to prevent double-start with reloader?
+# paho-mqtt loop_start() is robust enough mostly.
+if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+    start_mqtt_client()
+else:
+    # Logic for production servers (gunicorn etc) or first run
+    start_mqtt_client()
+
+
 RESET_LINK_DEBUG = bool(int(os.environ.get("RESET_LINK_DEBUG", "0")))
 SMTP_HOST = os.environ.get("SMTP_HOST")
 SMTP_PORT = int(os.environ.get("SMTP_PORT", "465"))
@@ -462,4 +481,5 @@ def google_callback():
 
 
 if __name__ == "__main__":
-  app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=bool(int(os.environ.get("FLASK_DEBUG", 0))))
+  # Change app.run to socketio.run
+  socketio.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=bool(int(os.environ.get("FLASK_DEBUG", 0))), allow_unsafe_werkzeug=True)

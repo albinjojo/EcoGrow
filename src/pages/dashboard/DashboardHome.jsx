@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import mqtt from 'mqtt'
+import { io } from 'socket.io-client'
 import {
   LineChart,
   Line,
@@ -32,73 +32,45 @@ const DashboardHome = () => {
   }
 
   useEffect(() => {
-    const mqttOption = {
-      clientId: 'emqx_react_' + Math.random().toString(16).substring(2, 8),
-      username: 'ecogrow',
-      password: 'albin2004',
-      clean: true,
-      reconnectPeriod: 1000,
-      connectTimeout: 30 * 1000,
-      rejectUnauthorized: true, // TLS
-    }
+    // Connect to Backend SocketIO
+    const socketUrl = 'http://localhost:5000'
+    const newSocket = io(socketUrl, {
+      transports: ['websocket'],
+      withCredentials: true
+    })
 
-    // Connect to EMQX Cloud via WebSocket (Secure)
-    const mqttClient = mqtt.connect('wss://e66b0f01.ala.asia-southeast1.emqxsl.com:8084/mqtt', mqttOption)
+    setClient(newSocket)
 
-    setClient(mqttClient)
-
-    mqttClient.on('connect', () => {
+    newSocket.on('connect', () => {
       setConnectionStatus('Connected')
-      console.log('Connected to EMQX Cloud')
+      console.log('Connected to Backend SocketIO')
+    })
 
-      // Subscribe to topics
-      mqttClient.subscribe(['ecogrow/sensors', 'ecogrow/status'], (err) => {
-        if (err) {
-          console.error('Subscription error:', err)
-        } else {
-          console.log('Subscribed to topics')
-        }
+    newSocket.on('sensor_update', (data) => {
+      // Data expected: { co2, temp, humidity, ... }
+      setSensorData(prev => ({ ...prev, ...data }))
+
+      const timestamp = new Date().toLocaleTimeString([], { hour12: false })
+      setSensorHistory(prev => {
+        const newData = [...prev, { ...data, time: timestamp }]
+        // Keep last 20 data points
+        if (newData.length > 20) return newData.slice(newData.length - 20)
+        return newData
       })
     })
 
-    mqttClient.on('message', (topic, message) => {
-      const payload = message.toString()
-
-      if (topic === 'ecogrow/sensors') {
-        try {
-          const data = JSON.parse(payload)
-          // {"co2":0,"temp":27.8,"humidity":74.3}
-          const timestamp = new Date().toLocaleTimeString([], { hour12: false })
-
-          setSensorData(data)
-          setSensorHistory(prev => {
-            const newData = [...prev, { ...data, time: timestamp }]
-            // Keep last 20 data points
-            if (newData.length > 20) return newData.slice(newData.length - 20)
-            return newData
-          })
-
-        } catch (e) {
-          console.error('Error parsing JSON:', e)
-        }
-      } else if (topic === 'ecogrow/status') {
-        setSystemStatus(payload) // "ESP32 ONLINE"
-      }
-    })
-
-    mqttClient.on('reconnect', () => {
-      setConnectionStatus('Reconnecting')
-    })
-
-    mqttClient.on('error', (err) => {
-      console.error('Connection error:', err)
+    newSocket.on('connect_error', (err) => {
+      console.error('Socket connection error:', err)
       setConnectionStatus('Error')
-      mqttClient.end()
+    })
+
+    newSocket.on('disconnect', () => {
+      setConnectionStatus('Disconnected')
     })
 
     return () => {
-      if (mqttClient) {
-        mqttClient.end()
+      if (newSocket) {
+        newSocket.disconnect()
       }
     }
   }, [])
@@ -133,7 +105,7 @@ const DashboardHome = () => {
       <div className="grid-header">
         <div>
           <p className="eyebrow" style={{ color: connectionStatus === 'Connected' ? '#10b981' : '#ef4444' }}>
-            MQTT: {connectionStatus} | Device: {systemStatus}
+            SocketIO: {connectionStatus} | Backend: Active
           </p>
           <h2>Facility Overview</h2>
         </div>
