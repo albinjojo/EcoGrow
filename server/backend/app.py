@@ -432,6 +432,67 @@ def health():
   return jsonify({"status": "ok"})
 
 
+@app.get("/api/sensors/history")
+def get_sensor_history():
+  """
+  Fetch recent sensor readings from database for the logged-in user.
+  Groups co2, temperature, and humidity readings by timestamp.
+  """
+  user_id = session.get("user_id") or 1  # Default to 1 for dev if no session
+  
+  conn = get_connection()
+  try:
+    cur = conn.cursor()
+    # Fetch last 60 records (which would be 20 sets of co2/temp/hum)
+    # or more if we want a longer history. Let's get last 150 records.
+    cur.execute(
+      """
+      SELECT sensor_type, value, timestamp_utc 
+      FROM sensor_readings 
+      WHERE user_id = %s 
+      ORDER BY timestamp_utc DESC 
+      LIMIT 150
+      """,
+      (user_id,)
+    )
+    rows = cur.fetchall()
+    cur.close()
+    
+    # Process rows into a list of { time, co2, temp, humidity }
+    # Since they are inserted together, they likely have exact same timestamp
+    data_map = {}
+    for sensor_type, value, ts in rows:
+      # Convert to HH:MM:SS for the chart
+      time_str = ts.strftime("%H:%M:%S")
+      if time_str not in data_map:
+        data_map[time_str] = {"time": time_str}
+      
+      # Map sensor_type to key used in frontend
+      key = "temp" if sensor_type == "temperature" else sensor_type
+      data_map[time_str][key] = float(value)
+    
+    # Sort by time and return as list
+    # Actually we should sort by original timestamp if possible, but time_str is okay for simple case
+    # Let's use the actual timestamp as key to sort properly
+    timestamp_map = {}
+    for sensor_type, value, ts in rows:
+      if ts not in timestamp_map:
+        timestamp_map[ts] = {"time": ts.strftime("%H:%M:%S")}
+      key = "temp" if sensor_type == "temperature" else sensor_type
+      timestamp_map[ts][key] = float(value)
+      
+    history = [timestamp_map[ts] for ts in sorted(timestamp_map.keys())]
+    
+    return jsonify(history), 200
+  except Exception as e:
+    with open("server_error.log", "a") as f:
+      f.write(f"\nError in /api/sensors/history: {str(e)}")
+      traceback.print_exc(file=f)
+    return jsonify({"message": "Unable to fetch sensor history."}), 500
+  finally:
+    conn.close()
+
+
 @app.get("/api/google/start")
 def google_start():
   flow = build_google_flow()

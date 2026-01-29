@@ -32,7 +32,31 @@ const DashboardHome = () => {
   }
 
   useEffect(() => {
-    // Connect to Backend SocketIO
+    // 1. Fetch Historical Data from DB
+    const fetchHistory = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/api/sensors/history')
+        if (response.ok) {
+          const data = await response.json()
+          setSensorHistory(data)
+          // Set latest readings as current state
+          if (data.length > 0) {
+            const latest = data[data.length - 1]
+            setSensorData({
+              co2: latest.co2 || 0,
+              temp: latest.temp || 0,
+              humidity: latest.humidity || 0
+            })
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch history:', err)
+      }
+    }
+
+    fetchHistory()
+
+    // 2. Connect to Backend SocketIO
     const socketUrl = 'http://localhost:5000'
     const newSocket = io(socketUrl, {
       transports: ['websocket'],
@@ -47,14 +71,14 @@ const DashboardHome = () => {
     })
 
     newSocket.on('sensor_update', (data) => {
-      // Data expected: { co2, temp, humidity, ... }
+      // Data expected: { co2, temp, humidity, timestamp }
       setSensorData(prev => ({ ...prev, ...data }))
 
-      const timestamp = new Date().toLocaleTimeString([], { hour12: false })
+      const timestamp = data.timestamp || new Date().toLocaleTimeString([], { hour12: false })
       setSensorHistory(prev => {
         const newData = [...prev, { ...data, time: timestamp }]
-        // Keep last 20 data points
-        if (newData.length > 20) return newData.slice(newData.length - 20)
+        // Keep last 40 data points (increased from 20 to show more history)
+        if (newData.length > 40) return newData.slice(newData.length - 40)
         return newData
       })
     })
