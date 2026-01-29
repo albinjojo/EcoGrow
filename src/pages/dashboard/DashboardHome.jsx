@@ -157,63 +157,126 @@ const DashboardHome = () => {
         ))}
       </div>
 
-      {/* Real-time Charts Section */}
-      <section className="section-main" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        <header className="panel-header">
-          <span className="panel-title">Real-time Environmental Data</span>
+      {/* Professional Data Visualization Grid */}
+      <section className="section-main" style={{ background: 'transparent', border: 'none', padding: 0 }}>
+        <header className="panel-header" style={{ marginBottom: '16px', borderRadius: 'var(--radius-sm)' }}>
+          <span className="panel-title">Environmental Monitoring Matrix</span>
         </header>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', height: '300px' }}>
+        <div className="charts-grid">
 
-          {/* Temperature Chart */}
-          <div style={{ background: 'var(--c-surface-1)', padding: '16px', borderRadius: '12px', border: '1px solid var(--c-border)' }}>
-            <h4 style={{ marginBottom: '10px', fontSize: '14px', color: 'var(--c-text-secondary)' }}>Temperature (°C)</h4>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={sensorHistory}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--c-border)" vertical={false} />
-                <XAxis dataKey="time" hide={true} />
-                <YAxis domain={['auto', 'auto']} style={{ fontSize: '12px' }} width={30} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)', color: 'var(--c-text-primary)' }}
-                  itemStyle={{ color: 'var(--c-text-primary)' }}
-                />
-                <Line type="monotone" dataKey="temp" stroke="#f59e0b" strokeWidth={2} dot={false} activeDot={{ r: 4 }} animationDuration={300} />
-              </LineChart>
-            </ResponsiveContainer>
+          {/* Temperature Chart Card */}
+          <div className="chart-card">
+            <div className="chart-card-header">
+              <h4 className="chart-card-title">Temperature Profile</h4>
+              <div className="status-badge active" style={{ fontSize: '9px' }}>Thermal Dynamic</div>
+            </div>
+            <div className="chart-container">
+              <div className="chart-label-y">Unit: Celsius (°C)</div>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={sensorHistory} margin={{ top: 5, right: 30, left: 0, bottom: 25 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={true} />
+                  <XAxis
+                    dataKey="time"
+                    tick={{ fontSize: 10 }}
+                    label={{ value: 'Timeline', position: 'insideBottomRight', offset: -15, fontSize: 11, fontWeight: 600 }}
+                  />
+                  <YAxis
+                    domain={['auto', 'auto']}
+                    tick={{ fontSize: 10 }}
+                    width={40}
+                  />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)', borderRadius: '8px' }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="temp"
+                    stroke="#f59e0b"
+                    strokeWidth={3}
+                    dot={{ r: 2 }}
+                    activeDot={{ r: 6 }}
+                    animationDuration={1500}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           </div>
 
-          {/* Humidity Chart */}
-          <div style={{ background: 'var(--c-surface-1)', padding: '16px', borderRadius: '12px', border: '1px solid var(--c-border)' }}>
-            <h4 style={{ marginBottom: '10px', fontSize: '14px', color: 'var(--c-text-secondary)' }}>Humidity (%)</h4>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={sensorHistory}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--c-border)" vertical={false} />
-                <XAxis dataKey="time" hide={true} />
-                <YAxis domain={[0, 100]} style={{ fontSize: '12px' }} width={30} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)', color: 'var(--c-text-primary)' }}
-                  itemStyle={{ color: 'var(--c-text-primary)' }}
-                />
-                <Line type="monotone" dataKey="humidity" stroke="#3b82f6" strokeWidth={2} dot={false} activeDot={{ r: 4 }} animationDuration={300} />
-              </LineChart>
-            </ResponsiveContainer>
+          {/* Humidity Chart Card */}
+          <div className="chart-card">
+            <div className="chart-card-header">
+              <h4 className="chart-card-title">Humidity Levels</h4>
+              <div className="status-badge active" style={{ fontSize: '9px', borderColor: '#3b82f6', color: '#3b82f6' }}>Stable</div>
+            </div>
+            <div className="chart-container">
+              <div className="chart-label-y">Unit: Percentage (%)</div>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={sensorHistory} margin={{ top: 5, right: 30, left: 0, bottom: 25 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={true} />
+                  <XAxis
+                    dataKey="time"
+                    tick={{ fontSize: 10 }}
+                    label={{ value: 'Timeline', position: 'insideBottomRight', offset: -15, fontSize: 11, fontWeight: 600 }}
+                  />
+                  <YAxis
+                    domain={[0, 100]}
+                    tick={{ fontSize: 10 }}
+                    width={40}
+                  />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)', borderRadius: '8px' }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="humidity"
+                    stroke="#3b82f6"
+                    strokeWidth={3}
+                    dot={{ r: 2 }}
+                    activeDot={{ r: 6 }}
+                    animationDuration={1500}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           </div>
 
-          {/* CO2 Chart */}
-          <div style={{ background: 'var(--c-surface-1)', padding: '16px', borderRadius: '12px', border: '1px solid var(--c-border)' }}>
-            <h4 style={{ marginBottom: '10px', fontSize: '14px', color: 'var(--c-text-secondary)' }}>CO2 (ppm)</h4>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={sensorHistory}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--c-border)" vertical={false} />
-                <XAxis dataKey="time" hide={true} />
-                <YAxis domain={['auto', 'auto']} style={{ fontSize: '12px' }} width={40} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)', color: 'var(--c-text-primary)' }}
-                  itemStyle={{ color: 'var(--c-text-primary)' }}
-                />
-                <Line type="monotone" dataKey="co2" stroke="#10b981" strokeWidth={2} dot={false} activeDot={{ r: 4 }} animationDuration={300} />
-              </LineChart>
-            </ResponsiveContainer>
+          {/* CO2 Chart Card */}
+          <div className="chart-card">
+            <div className="chart-card-header">
+              <h4 className="chart-card-title">Carbon Dioxide Concentration</h4>
+              <div className="status-badge active" style={{ fontSize: '9px', borderColor: '#10b981', color: '#10b981' }}>Optimal</div>
+            </div>
+            <div className="chart-container">
+              <div className="chart-label-y">Unit: Parts Per Million (ppm)</div>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={sensorHistory} margin={{ top: 5, right: 30, left: 0, bottom: 25 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={true} />
+                  <XAxis
+                    dataKey="time"
+                    tick={{ fontSize: 10 }}
+                    label={{ value: 'Timeline', position: 'insideBottomRight', offset: -15, fontSize: 11, fontWeight: 600 }}
+                  />
+                  <YAxis
+                    domain={['auto', 'auto']}
+                    tick={{ fontSize: 10 }}
+                    width={50}
+                  />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: 'var(--c-surface-2)', borderColor: 'var(--c-border)', borderRadius: '8px' }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="co2"
+                    stroke="#10b981"
+                    strokeWidth={3}
+                    dot={{ r: 2 }}
+                    activeDot={{ r: 6 }}
+                    animationDuration={1500}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           </div>
 
         </div>
