@@ -19,9 +19,7 @@ const AuthLayout = ({ children, heading }) => {
       </div>
 
       <div className="form-side">
-        <div className="admin-chip">
-          <Link to="/auth/admin-login">Admin panel</Link>
-        </div>
+
 
         <div className="auth-card">
           <div className="brand-row">

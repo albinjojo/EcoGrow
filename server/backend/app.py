@@ -547,6 +547,58 @@ def get_sensor_history():
     conn.close()
 
 
+@app.get("/api/sensors/reports")
+def get_sensor_reports():
+  """
+  Fetch all sensor readings for the logged-in user to generate reports.
+  """
+  user_id = session.get("user_id") or 1  # Default to 1 for dev
+  
+  conn = get_connection()
+  try:
+    cur = conn.cursor()
+    # Fetch a larger set of records for reporting (e.g., last 1000)
+    cur.execute(
+      """
+      SELECT sensor_type, value, timestamp_utc 
+      FROM sensor_readings 
+      WHERE user_id = %s 
+      ORDER BY timestamp_utc DESC 
+      LIMIT 1000
+      """,
+      (user_id,)
+    )
+    rows = cur.fetchall()
+    cur.close()
+    
+    timestamp_map = {}
+    for sensor_type, value, ts in rows:
+      # Use ISO format for better frontend parsing and display
+      ts_str = ts.strftime("%Y-%m-%d %H:%M:%S")
+      if ts_str not in timestamp_map:
+        timestamp_map[ts_str] = {
+          "timestamp": ts_str,
+          "co2": 0,
+          "temp": 0,
+          "humidity": 0
+        }
+      
+      key = "temp" if sensor_type == "temperature" else sensor_type
+      timestamp_map[ts_str][key] = float(value)
+      
+    # Return sorted by timestamp (oldest first for charts, though frontend can reverse for table)
+    reports = [timestamp_map[ts] for ts in sorted(timestamp_map.keys())]
+    
+    return jsonify(reports), 200
+  except Exception as e:
+    with open("server_error.log", "a") as f:
+      f.write(f"\nError in /api/sensors/reports: {str(e)}")
+      traceback.print_exc(file=f)
+    return jsonify({"message": "Unable to fetch sensor reports."}), 500
+  finally:
+    conn.close()
+
+
 @app.get("/api/google/start")
 def google_start():
   flow = build_google_flow()
