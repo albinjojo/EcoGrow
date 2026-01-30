@@ -136,7 +136,7 @@ const DashboardLayout = () => {
             <h1>Dashboard</h1>
           </div>
           <div className="topbar-actions">
-            <input className="search-input" type="search" placeholder="Search sensors..." aria-label="Search" />
+
             <button className="btn-ghost" type="button">Refresh</button>
             <NavLink to="/dashboard/account" className="user-chip" aria-label={`${userProfile.name} - ${userProfile.role}`} style={{ textDecoration: 'none', cursor: 'pointer' }}>
               <div className="user-avatar">{userProfile.name.charAt(0).toUpperCase()}</div>
