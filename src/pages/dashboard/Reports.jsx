@@ -36,6 +36,22 @@ const Reports = () => {
   // Reverse data for the table to show newest first
   const tableData = [...reportsData].reverse()
 
+  // Pagination Logic
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
+  const indexOfLastItem = currentPage * itemsPerPage
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage
+  const currentItems = tableData.slice(indexOfFirstItem, indexOfLastItem)
+  const totalPages = Math.ceil(tableData.length / itemsPerPage)
+
+  const nextPage = () => {
+    if (currentPage < totalPages) setCurrentPage(prev => prev + 1)
+  }
+
+  const prevPage = () => {
+    if (currentPage > 1) setCurrentPage(prev => prev - 1)
+  }
+
   return (
     <div className="dash-page">
       <div className="page-header">
@@ -74,8 +90,8 @@ const Reports = () => {
         </div>
 
         {/* Data Table */}
-        <div className="section-main" style={{ padding: '0', background: 'transparent', border: 'none' }}>
-          <header className="panel-header" style={{ marginBottom: '16px' }}>
+        <div className="section-main" style={{ borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
+          <header className="panel-header" style={{ marginBottom: '0' }}>
             <span className="panel-title">Detailed Sensor Logs</span>
           </header>
 
@@ -96,7 +112,7 @@ const Reports = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {tableData.map((row, idx) => (
+                    {currentItems.map((row, idx) => (
                       <tr key={idx} style={{ borderBottom: '1px solid var(--c-border)' }}>
                         <td style={{ padding: '12px 16px' }}>{row.timestamp}</td>
                         <td style={{ padding: '12px 16px' }}>{row.temp}</td>
@@ -106,11 +122,38 @@ const Reports = () => {
                     ))}
                   </tbody>
                 </table>
+
+                {/* Pagination Controls */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderTop: '1px solid var(--c-border)' }}>
+                  <span style={{ fontSize: '12px', color: 'var(--c-text-secondary)' }}>
+                    Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, tableData.length)} of {tableData.length} entries
+                  </span>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      onClick={prevPage}
+                      disabled={currentPage === 1}
+                      className="btn-ghost"
+                      style={{ fontSize: '12px', padding: '6px 12px', opacity: currentPage === 1 ? 0.5 : 1 }}
+                    >
+                      Previous
+                    </button>
+                    <span style={{ fontSize: '12px', padding: '6px 12px', background: 'var(--c-surface-2)', borderRadius: '4px' }}>
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <button
+                      onClick={nextPage}
+                      disabled={currentPage === totalPages}
+                      className="btn-ghost"
+                      style={{ fontSize: '12px', padding: '6px 12px', opacity: currentPage === totalPages ? 0.5 : 1 }}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
           </div>
         </div>
-
       </div>
     </div>
   )
