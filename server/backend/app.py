@@ -27,6 +27,7 @@ from google.auth.transport import requests as google_requests
 from db_connect import get_connection
 from user_account import account_bp
 from ai_service import ai_bp
+from validators import validate_email, validate_password
 
 from flask_socketio import SocketIO
 from mqtt_service import start_mqtt_client, set_socketio
@@ -106,26 +107,26 @@ def insert_user(conn, email: str, password_hash: str):
 
 def upsert_google_user(conn, email: str):
   cur = conn.cursor()
-  cur.execute("SELECT id, role FROM users WHERE email=%s", (email,))
+  cur.execute("SELECT id, role, status FROM users WHERE email=%s", (email,))
   existing = cur.fetchone()
   if existing:
     cur.close()
     return existing
   cur.execute(
-    "INSERT INTO users (email, provider, role) VALUES (%s, %s, %s)",
-    (email, "google", "USER"),
+    "INSERT INTO users (email, provider, role, status) VALUES (%s, %s, %s, %s)",
+    (email, "google", "USER", "active"),
   )
   conn.commit()
   new_id = cur.lastrowid
   cur.close()
-  return (new_id, "USER")
+  return (new_id, "USER", "active")
 
 
 def get_user_with_password(conn, email: str):
-  """Fetch user id, hash, provider, and role for login."""
+  """Fetch user id, hash, provider, role, and status for login."""
   cur = conn.cursor()
   cur.execute(
-    "SELECT id, email, password_hash, provider, role FROM users WHERE email=%s LIMIT 1",
+    "SELECT id, email, password_hash, provider, role, status FROM users WHERE email=%s LIMIT 1",
     (email,),
   )
   row = cur.fetchone()
@@ -255,7 +256,10 @@ def login_user():
     if not user_row:
       return jsonify({"message": "Invalid credentials."}), 401
 
-    user_id, _, password_hash, provider, role = user_row
+    user_id, _, password_hash, provider, role, status = user_row
+    if status != "active":
+      return jsonify({"message": "Account is disabled. Please contact support."}), 403
+
     if provider != "password":
       return jsonify({"message": "Use Google sign-in for this account."}), 400
 
@@ -399,28 +403,78 @@ def get_all_users():
   try:
     cur = conn.cursor()
     cur.execute(
-      "SELECT id, email, role, provider, created_at FROM users ORDER BY created_at DESC",
+      "SELECT id, email, role, provider, created_at, status FROM users ORDER BY created_at DESC",
     )
     rows = cur.fetchall()
     cur.close()
     
     users = []
     for row in rows:
-      user_id_db, email, role, provider, created_at = row
+      user_id_db, email, role, provider, created_at, status = row
       users.append({
         "id": user_id_db,
         "email": email,
         "role": role,
         "provider": provider,
         "createdAt": created_at.isoformat() if created_at else None,
-        "status": "Active",  # Can be extended with last_login tracking
+        "status": status if status else "active",
       })
     
     return jsonify({"users": users, "total": len(users)}), 200
   except Exception as e:
-    with open("server_error.log", "w") as f:
+    with open("server_error.log", "a") as f:
+      f.write(f"\nError in get_all_users: {str(e)}")
       traceback.print_exc(file=f)
     return jsonify({"message": "Unable to fetch users."}), 500
+  finally:
+    conn.close()
+
+
+@app.patch("/api/users/<int:user_id_to_mod>/status")
+def toggle_status(user_id_to_mod):
+  """Toggle user status between active and inactive."""
+  admin_id = session.get("user_id")
+  admin_role = session.get("role")
+  if not admin_id or admin_role != "ADMIN":
+    return jsonify({"message": "Forbidden."}), 403
+  
+  data = request.get_json(silent=True) or {}
+  new_status = data.get("status")
+  if new_status not in ["active", "inactive"]:
+    return jsonify({"message": "Invalid status."}), 400
+    
+  conn = get_connection()
+  try:
+    cur = conn.cursor()
+    cur.execute("UPDATE users SET status=%s WHERE id=%s", (new_status, user_id_to_mod))
+    conn.commit()
+    cur.close()
+    return jsonify({"message": f"User status updated to {new_status}."}), 200
+  except Exception as e:
+    return jsonify({"message": "Unable to update status."}), 500
+  finally:
+    conn.close()
+
+
+@app.delete("/api/users/<int:user_id_to_del>")
+def delete_user_account(user_id_to_del):
+  """Permanently delete a user account."""
+  admin_id = session.get("user_id")
+  admin_role = session.get("role")
+  if not admin_id or admin_role != "ADMIN":
+    return jsonify({"message": "Forbidden."}), 403
+  
+  conn = get_connection()
+  try:
+    cur = conn.cursor()
+    # Delete related sensor readings first due to FK or logic
+    cur.execute("DELETE FROM sensor_readings WHERE user_id=%s", (user_id_to_del,))
+    cur.execute("DELETE FROM users WHERE id=%s", (user_id_to_del,))
+    conn.commit()
+    cur.close()
+    return jsonify({"message": "User deleted successfully."}), 200
+  except Exception as e:
+    return jsonify({"message": "Unable to delete user."}), 500
   finally:
     conn.close()
 
@@ -526,7 +580,10 @@ def google_callback():
 
   conn = get_connection()
   try:
-    user_id, role = upsert_google_user(conn, email)
+    user_id, role, status = upsert_google_user(conn, email)
+    
+    if status != "active":
+      return jsonify({"message": "Account is disabled."}), 403
     
     # establish session
     session["user_id"] = user_id

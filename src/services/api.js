@@ -77,3 +77,16 @@ export const updateAccountProfile = async (profileData) => {
 export const fetchAllUsers = async () => {
   return request('/users')
 }
+
+export const deleteUser = async (id) => {
+  return request(`/users/${id}`, {
+    method: 'DELETE',
+  })
+}
+
+export const toggleUserStatus = async (id, status) => {
+  return request(`/users/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  })
+}

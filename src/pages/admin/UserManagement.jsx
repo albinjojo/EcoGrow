@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import DataTable from '../../components/admin/DataTable'
 import Modal from '../../components/admin/Modal'
 import FormField from '../../components/admin/FormField'
-import { fetchAllUsers } from '../../services/api'
+import { fetchAllUsers, deleteUser, toggleUserStatus } from '../../services/api'
 
 /**
  * UserManagement - Admin page for managing user accounts
@@ -23,32 +23,32 @@ const UserManagement = () => {
   const [formData, setFormData] = useState({ name: '', email: '', role: 'USER' })
   const [errors, setErrors] = useState({})
 
+  const loadUsers = async () => {
+    try {
+      setLoading(true)
+      const response = await fetchAllUsers()
+      // Map API response to component data structure
+      const mappedUsers = response.users.map((user) => ({
+        id: user.id,
+        name: user.email.split('@')[0], // Use part of email as name if name not available
+        email: user.email,
+        role: user.role,
+        status: user.status || 'active',
+        joinDate: new Date(user.createdAt).toISOString().split('T')[0] || 'N/A',
+        devices: 0, // Can be extended when device API is available
+      }))
+      setUsers(mappedUsers)
+      setError(null)
+    } catch (err) {
+      setError(err.message || 'Failed to load users')
+      console.error('Error fetching users:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   // Fetch users from API on component mount
   useEffect(() => {
-    const loadUsers = async () => {
-      try {
-        setLoading(true)
-        const response = await fetchAllUsers()
-        // Map API response to component data structure
-        const mappedUsers = response.users.map((user) => ({
-          id: user.id,
-          name: user.email.split('@')[0], // Use part of email as name if name not available
-          email: user.email,
-          role: user.role,
-          status: user.status || 'active',
-          joinDate: new Date(user.createdAt).toISOString().split('T')[0] || 'N/A',
-          devices: 0, // Can be extended when device API is available
-        }))
-        setUsers(mappedUsers)
-        setError(null)
-      } catch (err) {
-        setError(err.message || 'Failed to load users')
-        console.error('Error fetching users:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-
     loadUsers()
   }, [])
 
@@ -100,18 +100,25 @@ const UserManagement = () => {
     setFormData({ name: '', email: '', role: 'USER' })
   }
 
-  const handleDeleteUser = (user) => {
-    if (confirm(`Delete user ${user.name}?`)) {
-      setUsers(users.filter((u) => u.id !== user.id))
+  const handleDeleteUser = async (user) => {
+    if (window.confirm(`Are you sure you want to PERMANENTLY delete user ${user.email}? This action cannot be undone.`)) {
+      try {
+        await deleteUser(user.id)
+        await loadUsers() // Refresh list
+      } catch (err) {
+        alert(`Failed to delete user: ${err.message}`)
+      }
     }
   }
 
-  const handleToggleStatus = (user) => {
-    setUsers(
-      users.map((u) =>
-        u.id === user.id ? { ...u, status: u.status === 'active' ? 'inactive' : 'active' } : u,
-      ),
-    )
+  const handleToggleStatus = async (user) => {
+    const newStatus = user.status === 'active' ? 'inactive' : 'active'
+    try {
+      await toggleUserStatus(user.id, newStatus)
+      await loadUsers() // Refresh list
+    } catch (err) {
+      alert(`Failed to update status: ${err.message}`)
+    }
   }
 
   const columns = [
