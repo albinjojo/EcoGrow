@@ -1,0 +1,203 @@
+#include <WiFi.h>
+#include <WiFiClientSecure.h>
+#include <PubSubClient.h>
+#include <HardwareSerial.h>
+#include <SensirionI2cScd4x.h>
+#include <Wire.h>
+#include <ArduinoJson.h>
+
+// WiFi
+const char* ssid = "lmaof";
+const char* password = "albin0009";
+
+// MQTT
+const char* mqtt_server = "e66b0f01.ala.asia-southeast1.emqxsl.com";
+const int mqtt_port = 8883;
+const char* mqtt_user = "ecogrow";
+const char* mqtt_pass = "albin2004";
+
+const char* topic_data = "ecogrow/sensors";
+const char* topic_status = "ecogrow/status";
+
+WiFiClientSecure espClient;
+PubSubClient client(espClient);
+
+// UART CO2 Sensor (DFRobot SEN0220)
+#define RXD2 16
+#define TXD2 17
+HardwareSerial co2Serial(1);
+unsigned char hexData[9] = {0xFF, 0x01, 0x86, 0x00, 0x00, 0x00, 0x00, 0x00, 0x79};
+
+// I2C SCD41 Sensor
+SensirionI2cScd4x sensor;
+static char errorMessage[64];
+static int16_t error;
+
+// Sensor data variables
+unsigned long dfrobotCO2 = 0;
+float temperature = 0.0;
+float relativeHumidity = 0.0;
+
+// Timing
+unsigned long lastPublish = 0;
+const long publishInterval = 10000; // 10 seconds
+
+void PrintUint64(uint64_t& value);
+
+void connectWiFi() {
+  WiFi.begin(ssid, password);
+  Serial.print("Connecting WiFi");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nWiFi OK");
+}
+
+void connectMQTT() {
+  String clientId = "ESP32-" + WiFi.macAddress();
+  while (!client.connected()) {
+    if (client.connect(clientId.c_str(), mqtt_user, mqtt_pass)) {
+      client.publish(topic_status, "LIVE", true);
+      Serial.println("MQTT connected");
+    } else {
+      Serial.print("MQTT failed, state=");
+      Serial.println(client.state());
+      delay(2000);
+    }
+  }
+}
+
+void publishData() {
+  JsonDocument doc;
+  doc["co2"] = dfrobotCO2;
+  doc["temp"] = round(temperature * 10) / 10.0;
+  doc["humidity"] = round(relativeHumidity * 10) / 10.0;
+  doc["ts"] = millis() / 1000;
+
+  char payload[256];
+  serializeJson(doc, payload);
+  client.publish(topic_data, payload);
+  Serial.print("MQTT: ");
+  Serial.println(payload);
+}
+
+void setup() {
+  Serial.begin(115200);
+  delay(100);
+
+  Serial.println("=== Multi-Sensor System Initializing ===");
+
+  // Initialize UART for DFRobot CO2 sensor
+  co2Serial.begin(9600, SERIAL_8N1, RXD2, TXD2);
+  Serial.println("DFRobot SEN0220 CO2 Sensor (UART) Initialized");
+
+  // Initialize I2C for SCD41 sensor
+  Wire.begin(21, 22);
+  sensor.begin(Wire, SCD41_I2C_ADDR_62);
+
+  uint64_t serialNumber = 0;
+  delay(30);
+
+  error = sensor.wakeUp();
+  if (error) {
+    Serial.print("Error wakeUp(): ");
+    errorToString(error, errorMessage, sizeof(errorMessage));
+    Serial.println(errorMessage);
+  }
+
+  error = sensor.stopPeriodicMeasurement();
+  if (error) {
+    Serial.print("Error stopPeriodicMeasurement(): ");
+    errorToString(error, errorMessage, sizeof(errorMessage));
+    Serial.println(errorMessage);
+  }
+
+  error = sensor.reinit();
+  if (error) {
+    Serial.print("Error reinit(): ");
+    errorToString(error, errorMessage, sizeof(errorMessage));
+    Serial.println(errorMessage);
+  }
+
+  error = sensor.getSerialNumber(serialNumber);
+  if (error) {
+    Serial.print("Error getSerialNumber(): ");
+    errorToString(error, errorMessage, sizeof(errorMessage));
+    Serial.println(errorMessage);
+  } else {
+    Serial.print("SCD41 connected, serial: ");
+    PrintUint64(serialNumber);
+    Serial.println();
+  }
+
+  error = sensor.startPeriodicMeasurement();
+  if (error) {
+    Serial.print("Error startPeriodicMeasurement(): ");
+    errorToString(error, errorMessage, sizeof(errorMessage));
+    Serial.println(errorMessage);
+  }
+
+  Serial.println("=== Preheating CO2 sensor (3 min) ===");
+  Serial.println("CO2[ppm]        Temp[°C]        Humidity[%RH]");
+  Serial.println("---------------------------------------");
+
+  // Connect WiFi and MQTT
+  connectWiFi();
+  espClient.setInsecure();
+  client.setServer(mqtt_server, mqtt_port);
+  connectMQTT();
+}
+
+void loop() {
+  if (!client.connected()) {
+    connectMQTT();
+  }
+  client.loop();
+
+  // Read CO2 from DFRobot SEN0220 (UART)
+  co2Serial.write(hexData, 9);
+  delay(100);
+
+  if (co2Serial.available() >= 9) {
+    byte response[9];
+    co2Serial.readBytes(response, 9);
+
+    if (response[0] == 0xFF && response[1] == 0x86) {
+      dfrobotCO2 = (unsigned long)response[2] * 256 + (unsigned long)response[3];
+    }
+  }
+
+  // Read Temperature and Humidity from SCD41 (I2C)
+  bool dataReady = false;
+  uint16_t scd41CO2 = 0;  // We'll ignore this value
+
+  error = sensor.getDataReadyStatus(dataReady);
+  if (!error && dataReady) {
+    error = sensor.readMeasurement(scd41CO2, temperature, relativeHumidity);
+    if (!error) {
+      // Print combined data
+      Serial.print(dfrobotCO2);
+      Serial.print("\t\t");
+      Serial.print(temperature, 1);
+      Serial.print("\t\t");
+      Serial.print(relativeHumidity, 1);
+      Serial.println();
+
+      // Publish to MQTT every 10 seconds
+      unsigned long now = millis();
+      if (now - lastPublish >= publishInterval) {
+        publishData();
+        lastPublish = now;
+      }
+    }
+  }
+
+  delay(2000);  // Sensor read interval
+}
+
+void PrintUint64(uint64_t& value) {
+  Serial.print("0x");
+  Serial.print((uint32_t)(value >> 32), HEX);
+  Serial.print((uint32_t)(value & 0xFFFFFFFF), HEX);
+}
