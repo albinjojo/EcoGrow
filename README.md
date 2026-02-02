@@ -1,89 +1,119 @@
-<<<<<<< HEAD
 # 🌱 EcoGrow – Greenhouse Environment Monitoring System
 
 EcoGrow is an IoT-based greenhouse monitoring system that uses an ESP32 and sensors to measure temperature, humidity, and CO₂ levels in real time. An AI model analyzes these readings to check whether the environment is safe for plant growth or if it may lead to harmful bacteria or fungal development. The system provides alerts when conditions become risky and also stores historical data to help farmers understand environmental changes over time.
 
-## ⭐ What EcoGrow Does
-- Monitors temperature, humidity, and CO₂ inside a greenhouse  
-- Uses AI to detect unsafe environmental conditions  
-- Predicts chances of bacteria or fungus growth  
-- Sends alerts when conditions become risky  
-- Shows historical readings and trend graphs  
-- Helps farmers maintain a healthy environment for their crops  
+## ⭐ Key Features
 
-## ⭐ How EcoGrow Works
-1. **ESP32 Sensor Module**  
-   The ESP32 collects temperature, humidity, and CO₂ data using connected sensors.
+- **Real-time Monitoring**: Tracks Temperature, Humidity, and CO₂ levels.
+- **AI Analysis**: Detects unsafe environmental conditions and predicts bacteria/fungus growth risks.
+- **Alert System**: Notifies users when environmental risks increase.
+- **Historical Data**: Visualizes past readings and trends.
+- **User Management**: Secure login/signup including Google OAuth.
 
-2. **Data Transfer to Backend**  
-   Sensor readings are sent to the backend server for processing.
+## 🛠️ Tech Stack
 
-3. **AI Analysis**  
-   An AI model checks whether conditions are ideal or may lead to bacterial/fungal growth.
+### Frontend
+- **React.js** (Vite)
+- **Recharts** for data visualization
+- **Socket.io-client** for real-time updates
 
-4. **Alerts & Recommendations**  
-   The system notifies the user when environmental risk increases.
+### Backend
+- **Python Flask**: Core API and business logic
+- **MySQL**: Relational database for storage
+- **MQTT (Paho)**: IoT data ingestion
+- **Socket.io**: Real-time communication with frontend
+- **Google OAuth**: User authentication
 
-5. **History & Trends**  
-   All readings are stored and displayed as easy-to-understand historical data.
+### IoT (Hardware)
+- **ESP32**: Microcontroller for sensor data collection
 
-## ⭐ Main Modules
-- Environmental Data Collection  
-- Data Transmission to Backend  
-- AI-Based Risk Prediction  
-- Ideal Condition Comparison  
-- Alerts & Recommendations  
-- History & Trend Analysis  
-- Multi-Zone Monitoring (Optional)
-=======
-🌱 EcoGrow – Greenhouse Environment Monitoring System
+## 📂 Project Structure
 
-EcoGrow is an IoT-based greenhouse monitoring system that uses an ESP32 and sensors to measure temperature, humidity, and CO₂ levels in real time. An AI model checks whether these conditions are safe for plant growth or if they could lead to harmful bacterial or fungal development. The system provides alerts when the environment becomes risky and also shows a history of past readings to help farmers understand how greenhouse conditions change over time.
+```
+ecogrow/
+├── src/                  # Frontend React application
+│   ├── components/       # Reusable UI components
+│   ├── pages/            # Application pages
+│   ├── services/         # API and service calls
+│   └── context/          # React Context (Auth, etc.)
+├── server/
+│   ├── backend/          # Python Flask Backend
+│   │   ├── app.py        # Main entry point for Flask app
+│   │   ├── ai_service.py # AI logic for risk prediction
+│   │   ├── mqtt_service.py # MQTT client handling
+│   │   └── sensor_handler.py # Sensor data processing
+│   └── db/
+│       └── schema.sql    # Database schema structure
+├── public/               # Static assets
+└── package.json          # Frontend dependencies and scripts
+```
 
-⭐ What EcoGrow Does
+## 🚀 Getting Started
 
-Monitors temperature, humidity, and CO₂ in a greenhouse
+### Prerequisites
+- Node.js & npm
+- Python 3.x
+- MySQL Server
+- MQTT Broker (e.g., EMQX, Mosquitto)
 
-Uses an AI model to detect unsafe conditions
+### 1. Database Setup
+1. Create a MySQL database (e.g., `ecogrow_db`).
+2. Import the schema from `server/db/schema.sql` into the database.
 
-Predicts chances of bacteria or fungus growth
+### 2. Backend Setup
+Navigate to the backend directory and install dependencies:
+```bash
+cd server/backend
+pip install -r requirements.txt
+```
 
-Sends alerts when risk is high
+Create a `.env` file in `server/backend/` with the following variables:
+```env
+# Database Configuration
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=your_password
+DB_NAME=ecogrow_db
 
-Shows historical data and trends for better understanding
+# Security & Auth
+FLASK_SECRET=your_super_secret_key
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+GOOGLE_REDIRECT_URI=http://localhost:5000/api/google/callback
 
-Helps farmers maintain a healthy environment for their crops
+# MQTT Configuration
+MQTT_BROKER=your_mqtt_broker_url
+MQTT_PORT=8883
+MQTT_TOPIC=ecogrow/sensors
+```
 
-⭐ How EcoGrow Works
+Run the backend server:
+```bash
+python app.py
+```
+*The backend server will start on port 5000.*
 
-ESP32 Sensor Module
-The ESP32 collects temperature, humidity, and CO₂ data using connected sensors.
+### 3. Frontend Setup
+Navigate to the project root and install dependencies:
+```bash
+npm install
+```
 
-Data Transfer to Backend
-The ESP32 sends all readings to the backend for processing.
+Run the frontend development server:
+```bash
+npm run dev
+```
+*The frontend will generally start on http://localhost:5173.*
 
-AI Analysis
-The backend uses an AI model to check if current conditions are safe or may lead to bacteria/fungal growth.
+## 🧪 Usage
+1. Open the frontend in your browser.
+2. Sign up or log in.
+3. View the Dashboard to see real-time sensor data from your ESP32.
+4. Check Reports for historical analysis and AI risk predictions.
 
-Alerts & Recommendations
-The system warns the user when conditions become unsafe.
-
-History & Trends
-All readings are stored so the user can view past environmental patterns.
-
-⭐ Main Modules
-
-Environmental Data Collection
-
-Data Transmission to Backend
-
-AI-Based Risk Prediction
-
-Ideal Condition Comparison
-
-Alerts and Recommendations
-
-History & Trend Analysis
-
-Multi-Zone Monitoring (optional)
->>>>>>> e03f96ae29b9689f2a56571804d3ff912347902e
+## 🤝 Contributing
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
