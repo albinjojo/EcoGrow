@@ -201,3 +201,44 @@ void PrintUint64(uint64_t& value) {
   Serial.print((uint32_t)(value >> 32), HEX);
   Serial.print((uint32_t)(value & 0xFFFFFFFF), HEX);
 }
+
+
+```text
+/*
+ * ESP32 MULTI-SENSOR SYSTEM OVERVIEW
+ * ----------------------------------
+ * This firmware implements an environmental monitoring node that integrates two 
+ * distinct sensors via UART and I2C protocols, transmitting data over MQTT.
+ *
+ * 1. HARDWARE INTERFACING:
+ *    - DFRobot SEN0220 (CO2): Communicates via HardwareSerial (UART). The ESP32 
+ *      sends a 9-byte request frame (hexData) and parses the 9-byte response to 
+ *      calculate CO2 concentration in ppm.
+ *    - Sensirion SCD41 (Temp/Humidity): Communicates via I2C (Pins 21/22). While 
+ *      it can measure CO2, this implementation specifically extracts high-accuracy 
+ *      Temperature and Relative Humidity data.
+ *
+ * 2. INITIALIZATION FLOW (setup):
+ *    - Serial Debugging: Starts at 115200 baud.
+ *    - SCD41 Configuration: Performs a hardware reset sequence (Stop -> Reinit -> Start) 
+ *      to ensure the sensor is in periodic measurement mode.
+ *    - Connectivity: Establishes a WiFi connection and configures the MQTT client 
+ *      with an insecure SSL/TLS layer for communication with the broker.
+ *
+ * 3. EXECUTION LOGIC (loop):
+ *    - Connection Management: Continuously monitors and restores MQTT connectivity 
+ *      if the link is dropped.
+ *    - Data Polling: 
+ *        a. Requests CO2 data from the DFRobot sensor using a specific hex command.
+ *        b. Checks the SCD41 'Data Ready' flag to prevent blocking. Once ready, 
+ *           retrieves the physical environmental metrics.
+ *    - Telemetry: Sensor data is printed to the local Serial console every 2 seconds.
+ *    - Publishing: Every 10 seconds (defined by publishInterval), the system 
+ *      triggers 'publishData()' to transmit a JSON-formatted payload to the MQTT broker.
+ *
+ * 4. HELPER FUNCTIONS:
+ *    - PrintUint64: Formats the SCD41's unique 64-bit hardware identifier into 
+ *      a readable hexadecimal string for device tracking.
+ */
+```
+
