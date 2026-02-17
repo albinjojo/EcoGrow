@@ -6,12 +6,13 @@ import './Dashboard.css'
 const Sensors = () => {
   // Dummy data for sensors
   const [sensors, setSensors] = useState([
-    { id: 1, name: 'Soil Moisture', active: true },
-    { id: 2, name: 'Temperature', active: true },
-    { id: 3, name: 'Humidity', active: true },
-    { id: 4, name: 'Light Intensity', active: false },
-    { id: 5, name: 'CO2 Level', active: true },
-    { id: 6, name: 'Water pH', active: false },
+
+    { id: 2, name: 'Temperature', active: true, detected: true },
+    { id: 3, name: 'Humidity', active: true, detected: true },
+    { id: 5, name: 'CO2 Level', active: true, detected: true },
+    { id: 1, name: 'Soil Moisture', active: false, detected: false },
+    { id: 4, name: 'Light Intensity', active: false, detected: false },
+    { id: 6, name: 'Water pH', active: false, detected: false },
   ])
 
   const toggleSensor = (id) => {
@@ -31,18 +32,19 @@ const Sensors = () => {
 
       <div className="sensor-list">
         {sensors.map((sensor) => (
-          <div key={sensor.id} className="sensor-card">
+          <div key={sensor.id} className="sensor-card" style={{ opacity: sensor.detected ? 1 : 0.7 }}>
             <div className="sensor-info">
               <span className="sensor-name">{sensor.name}</span>
-              <span className="sensor-status" style={{ color: sensor.active ? 'var(--c-status-safe)' : 'var(--c-text-tertiary)' }}>
-                {sensor.active ? 'Active' : 'Inactive'}
+              <span className="sensor-status" style={{ color: sensor.detected ? (sensor.active ? 'var(--c-status-safe)' : 'var(--c-text-tertiary)') : 'var(--c-status-danger)' }}>
+                {sensor.detected ? (sensor.active ? 'Active' : 'Inactive') : 'Not Detected'}
               </span>
             </div>
-            <label className="toggle-switch">
+            <label className="toggle-switch" style={{ cursor: sensor.detected ? 'pointer' : 'not-allowed', opacity: sensor.detected ? 1 : 0.5 }}>
               <input
                 type="checkbox"
                 checked={sensor.active}
-                onChange={() => toggleSensor(sensor.id)}
+                onChange={() => sensor.detected && toggleSensor(sensor.id)}
+                disabled={!sensor.detected}
               />
               <span className="slider"></span>
             </label>
