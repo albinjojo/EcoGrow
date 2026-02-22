@@ -100,7 +100,7 @@ const DashboardLayout = () => {
                         {link.label}
                       </NavLink>
                     ) : (
-                      <span className="nav-link" style={{ opacity: 0.5, cursor: 'not-allowed' }}>
+                      <span className="nav-link" style={{ opacity: 0.7, cursor: 'not-allowed' }}>
                         {link.label}
                       </span>
                     )}

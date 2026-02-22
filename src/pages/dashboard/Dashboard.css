@@ -8,7 +8,8 @@
   background: var(--c-bg-app);
   display: grid;
   grid-template-columns: 240px 1fr;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
 h1,
@@ -28,6 +29,10 @@ p {
   flex-direction: column;
   padding: 16px;
   gap: 24px;
+  height: 100vh;
+  overflow-y: auto;
+  position: sticky;
+  top: 0;
 }
 
 .sidebar-brand {
@@ -80,28 +85,33 @@ p {
   align-items: center;
   padding: 8px 12px;
   text-decoration: none;
-  color: #a0a6a0;
-  font-size: 13px;
+  color: #ffffff !important;
+  font-size: 14px;
+  font-weight: 500;
   border-radius: var(--radius-sm);
-  transition: all 0.1s;
+  transition: all 0.15s;
   border: 1px solid transparent;
+  opacity: 1 !important;
 }
 
 .nav-link:hover {
-  background: #2a2d2a;
-  color: white;
+  background: #c8e6c0;
+  color: #000000 !important;
 }
 
 .nav-link-active {
   background: var(--c-accent-primary);
-  color: white;
+  color: #000000 !important;
   border-color: #3e7036;
+  font-weight: 700;
 }
 
 /* --- Topbar --- */
 .dashboard-main {
   display: flex;
   flex-direction: column;
+  height: 100vh;
+  overflow-y: auto;
 }
 
 .dashboard-topbar {
@@ -112,6 +122,9 @@ p {
   justify-content: space-between;
   align-items: center;
   height: 60px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
 .topbar-left h1 {
