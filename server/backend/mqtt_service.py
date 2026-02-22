@@ -14,6 +14,13 @@ socketio_instance = None
 # In-memory cache for throttling DB writes: { user_id: last_timestamp_utc }
 LAST_SAVED = {}
 
+# Latest sensor snapshot — updated on every MQTT message
+LATEST_SENSOR_DATA = {}
+
+def get_latest_sensor_data():
+    """Return the most recent sensor values received from MQTT."""
+    return LATEST_SENSOR_DATA
+
 def set_socketio(sio):
     global socketio_instance
     socketio_instance = sio
@@ -46,6 +53,12 @@ def on_message(client, userdata, msg):
         
         # Default to User ID 1 if not provided in payload
         user_id = data.get("user_id", 1)
+
+        # 0. Update in-memory snapshot (always, for instant access by ai_service)
+        LATEST_SENSOR_DATA["co2"]       = co2
+        LATEST_SENSOR_DATA["temp"]      = temp
+        LATEST_SENSOR_DATA["humidity"]  = humidity
+        LATEST_SENSOR_DATA["timestamp"] = datetime.now().strftime("%H:%M:%S")
         
         # 1. Database Insertion (Throttled)
         save_to_db_throttled(user_id, co2, temp, humidity)
