@@ -137,7 +137,7 @@ const DashboardLayout = () => {
           </div>
           <div className="topbar-actions">
 
-            <button className="btn-ghost" type="button">Refresh</button>
+            <button className="btn-ghost" type="button" onClick={() => window.location.reload()}>Refresh</button>
             <NavLink to="/dashboard/account" className="user-chip" aria-label={`${userProfile.name} - ${userProfile.role}`} style={{ textDecoration: 'none', cursor: 'pointer' }}>
               <div className="user-avatar">{userProfile.name.charAt(0).toUpperCase()}</div>
               <div>
