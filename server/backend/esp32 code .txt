@@ -1,7 +1,7 @@
+#include <Arduino.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <PubSubClient.h>
-#include <HardwareSerial.h>
 #include <SensirionI2cScd4x.h>
 #include <Wire.h>
 #include <ArduinoJson.h>
@@ -22,11 +22,24 @@ const char* topic_status = "ecogrow/status";
 WiFiClientSecure espClient;
 PubSubClient client(espClient);
 
-// UART CO2 Sensor (DFRobot SEN0220)
-#define RXD2 16
-#define TXD2 17
-HardwareSerial co2Serial(1);
-unsigned char hexData[9] = {0xFF, 0x01, 0x86, 0x00, 0x00, 0x00, 0x00, 0x00, 0x79};
+// PWM CO2 Sensor (MTP80-A MemsFrontier)
+#define CO2_PWM_PIN 16
+unsigned long dfrobotCO2 = 0;
+
+unsigned long readCO2PWM() {
+  unsigned long TH = pulseIn(CO2_PWM_PIN, HIGH, 2000000);
+  unsigned long TL = pulseIn(CO2_PWM_PIN, LOW,  2000000);
+
+  if (TH == 0 || TL == 0) {
+    Serial.println("PWM timeout - check sensor connection");
+    return 0;
+  }
+
+  // MTP80-A official formula: Cppm = 5000 * (TH - 2ms) / (TH + TL - 4ms)
+  // TH and TL are in microseconds, 2ms = 2000us, 4ms = 4000us
+  unsigned long co2 = 5000UL * (TH - 2000) / (TH + TL - 4000);
+  return co2;
+}
 
 // I2C SCD41 Sensor
 SensirionI2cScd4x sensor;
@@ -34,7 +47,6 @@ static char errorMessage[64];
 static int16_t error;
 
 // Sensor data variables
-unsigned long dfrobotCO2 = 0;
 float temperature = 0.0;
 float relativeHumidity = 0.0;
 
@@ -88,9 +100,9 @@ void setup() {
 
   Serial.println("=== Multi-Sensor System Initializing ===");
 
-  // Initialize UART for DFRobot CO2 sensor
-  co2Serial.begin(9600, SERIAL_8N1, RXD2, TXD2);
-  Serial.println("DFRobot SEN0220 CO2 Sensor (UART) Initialized");
+  // Initialize PWM pin for MTP80-A CO2 sensor
+  pinMode(CO2_PWM_PIN, INPUT);
+  Serial.println("MTP80-A CO2 Sensor (PWM) Initialized on GPIO16");
 
   // Initialize I2C for SCD41 sensor
   Wire.begin(21, 22);
@@ -155,18 +167,8 @@ void loop() {
   }
   client.loop();
 
-  // Read CO2 from DFRobot SEN0220 (UART)
-  co2Serial.write(hexData, 9);
-  delay(100);
-
-  if (co2Serial.available() >= 9) {
-    byte response[9];
-    co2Serial.readBytes(response, 9);
-
-    if (response[0] == 0xFF && response[1] == 0x86) {
-      dfrobotCO2 = (unsigned long)response[2] * 256 + (unsigned long)response[3];
-    }
-  }
+  // Read CO2 from MTP80-A via PWM
+  dfrobotCO2 = readCO2PWM();
 
   // Read Temperature and Humidity from SCD41 (I2C)
   bool dataReady = false;
@@ -203,42 +205,14 @@ void PrintUint64(uint64_t& value) {
 }
 
 
-```text
-/*
- * ESP32 MULTI-SENSOR SYSTEM OVERVIEW
- * ----------------------------------
- * This firmware implements an environmental monitoring node that integrates two 
- * distinct sensors via UART and I2C protocols, transmitting data over MQTT.
- *
- * 1. HARDWARE INTERFACING:
- *    - DFRobot SEN0220 (CO2): Communicates via HardwareSerial (UART). The ESP32 
- *      sends a 9-byte request frame (hexData) and parses the 9-byte response to 
- *      calculate CO2 concentration in ppm.
- *    - Sensirion SCD41 (Temp/Humidity): Communicates via I2C (Pins 21/22). While 
- *      it can measure CO2, this implementation specifically extracts high-accuracy 
- *      Temperature and Relative Humidity data.
- *
- * 2. INITIALIZATION FLOW (setup):
- *    - Serial Debugging: Starts at 115200 baud.
- *    - SCD41 Configuration: Performs a hardware reset sequence (Stop -> Reinit -> Start) 
- *      to ensure the sensor is in periodic measurement mode.
- *    - Connectivity: Establishes a WiFi connection and configures the MQTT client 
- *      with an insecure SSL/TLS layer for communication with the broker.
- *
- * 3. EXECUTION LOGIC (loop):
- *    - Connection Management: Continuously monitors and restores MQTT connectivity 
- *      if the link is dropped.
- *    - Data Polling: 
- *        a. Requests CO2 data from the DFRobot sensor using a specific hex command.
- *        b. Checks the SCD41 'Data Ready' flag to prevent blocking. Once ready, 
- *           retrieves the physical environmental metrics.
- *    - Telemetry: Sensor data is printed to the local Serial console every 2 seconds.
- *    - Publishing: Every 10 seconds (defined by publishInterval), the system 
- *      triggers 'publishData()' to transmit a JSON-formatted payload to the MQTT broker.
- *
- * 4. HELPER FUNCTIONS:
- *    - PrintUint64: Formats the SCD41's unique 64-bit hardware identifier into 
- *      a readable hexadecimal string for device tracking.
- */
-```
 
+[env:esp32dev]
+platform = espressif32
+board = esp32dev
+framework = arduino
+monitor_speed = 115200
+
+lib_deps = 
+    sensirion/Sensirion I2C SCD4x@^1.0.0
+    bblanchon/ArduinoJson@^7.0.0
+    knolleary/PubSubClient@^2.8
