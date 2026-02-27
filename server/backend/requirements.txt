@@ -8,3 +8,4 @@ google-auth-oauthlib==1.2.1
 paho-mqtt
 flask-socketio
 simple-websocket
+google-generativeai

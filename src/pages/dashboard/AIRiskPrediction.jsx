@@ -1,5 +1,156 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import './Dashboard.css'
+
+/* ══════════════════════════════════════════════════════════════
+   Toast Alert System
+══════════════════════════════════════════════════════════════ */
+const TOAST_DURATION = 8000  // ms before auto-dismiss
+
+const SEVERITY_STYLES = {
+  warning: {
+    border: '#f59e0b',
+    bg: '#fffbeb',
+    icon: '⚠️',
+    badge: { bg: '#fef3c7', color: '#92400e', border: '#fcd34d' },
+  },
+  critical: {
+    border: '#ef4444',
+    bg: '#fff1f2',
+    icon: '🚨',
+    badge: { bg: '#fee2e2', color: '#991b1b', border: '#fca5a5' },
+  },
+}
+
+const METRIC_ICONS = { temp: '🌡️', humidity: '💧', co2: '🌿' }
+
+const AlertToast = ({ toast, onDismiss }) => {
+  const [progress, setProgress] = useState(100)
+  const [exiting, setExiting] = useState(false)
+  const intervalRef = useRef(null)
+
+  useEffect(() => {
+    const start = Date.now()
+    intervalRef.current = setInterval(() => {
+      const elapsed = Date.now() - start
+      const pct = Math.max(0, 100 - (elapsed / TOAST_DURATION) * 100)
+      setProgress(pct)
+      if (pct <= 0) {
+        clearInterval(intervalRef.current)
+        handleDismiss()
+      }
+    }, 80)
+    return () => clearInterval(intervalRef.current)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const handleDismiss = () => {
+    setExiting(true)
+    setTimeout(() => onDismiss(toast.id), 320)
+  }
+
+  const sty = SEVERITY_STYLES[toast.severity] || SEVERITY_STYLES.warning
+  const metricIcon = METRIC_ICONS[toast.metric] || '📊'
+
+  return (
+    <div
+      style={{
+        background: sty.bg,
+        border: `1px solid ${sty.border}`,
+        borderLeft: `4px solid ${sty.border}`,
+        borderRadius: '0',
+        padding: '12px 36px 0 14px',
+        width: '320px',
+        boxShadow: '0 8px 24px rgba(0,0,0,0.14)',
+        position: 'relative',
+        overflow: 'hidden',
+        transform: exiting ? 'translateX(360px)' : 'translateX(0)',
+        opacity: exiting ? 0 : 1,
+        transition: 'transform 0.32s cubic-bezier(0.4,0,1,1), opacity 0.28s ease',
+        animation: 'toast-slide-in 0.3s cubic-bezier(0.16,1,0.3,1)',
+      }}
+    >
+      {/* Close button */}
+      <button
+        onClick={handleDismiss}
+        style={{
+          position: 'absolute', top: '8px', right: '10px',
+          background: 'none', border: 'none', cursor: 'pointer',
+          fontSize: '14px', color: '#6b7280', lineHeight: 1, padding: '2px 4px',
+        }}
+        aria-label="Dismiss alert"
+      >✕</button>
+
+      {/* Header row */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '6px' }}>
+        <span style={{ fontSize: '16px', lineHeight: 1, marginTop: '1px', flexShrink: 0 }}>{sty.icon}</span>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+            <span style={{
+              fontSize: '10px', fontWeight: 700, textTransform: 'uppercase',
+              letterSpacing: '0.6px', fontFamily: 'var(--font-mono)',
+              padding: '2px 7px',
+              background: sty.badge.bg, color: sty.badge.color,
+              border: `1px solid ${sty.badge.border}`,
+            }}>
+              {toast.severity}
+            </span>
+            <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: '#6b7280' }}>
+              {metricIcon} {toast.label.toUpperCase()}
+            </span>
+          </div>
+          <p style={{
+            fontSize: '13px', fontWeight: 600, color: '#111827',
+            marginTop: '4px', lineHeight: 1.4,
+          }}>
+            {toast.message}
+          </p>
+        </div>
+      </div>
+
+      {/* Gemini suggestion */}
+      {toast.suggestion && (
+        <p style={{
+          fontSize: '11.5px', color: '#4b5563', fontStyle: 'italic',
+          lineHeight: 1.5, marginBottom: '10px',
+          borderTop: '1px solid rgba(0,0,0,0.07)', paddingTop: '6px',
+        }}>
+          💡 {toast.suggestion}
+        </p>
+      )}
+
+      {/* Progress bar */}
+      <div style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0,
+        height: '3px', background: 'rgba(0,0,0,0.07)',
+      }}>
+        <div style={{
+          height: '100%',
+          width: `${progress}%`,
+          background: sty.border,
+          transition: 'width 0.08s linear',
+        }} />
+      </div>
+    </div>
+  )
+}
+
+const AlertToastContainer = ({ toasts, onDismiss }) => {
+  if (!toasts.length) return null
+  return (
+    <div style={{
+      position: 'fixed', top: '16px', right: '16px',
+      zIndex: 9999,
+      display: 'flex', flexDirection: 'column', gap: '10px',
+      pointerEvents: 'none',
+    }}>
+      {toasts.slice(0, 5).map(t => (
+        <div key={t.id} style={{ pointerEvents: 'auto' }}>
+          <AlertToast toast={t} onDismiss={onDismiss} />
+        </div>
+      ))}
+    </div>
+  )
+}
 
 const CROP_TYPES = ['tomato', 'capsicum', 'cucumber', 'lettuce', 'strawberry']
 const CROP_STAGES = ['vegetative', 'flowering', 'fruiting']
@@ -101,6 +252,10 @@ function injectKeyframes() {
     }
     @keyframes gs-spin {
       to { transform: rotate(360deg); }
+    }
+    @keyframes toast-slide-in {
+      from { transform: translateX(380px); opacity: 0; }
+      to   { transform: translateX(0);    opacity: 1; }
     }
     .gs-plant-svg     { transition: all 0.35s ease; }
     .gs-anim-float    { animation: gs-float 3s ease-in-out infinite; }
@@ -214,11 +369,21 @@ const AIRiskPrediction = () => {
   const [cropType, setCropType] = useState('lettuce')
   const [cropStage, setCropStage] = useState('vegetative')
 
+  // ── Toast state ─────────────────────────────────────────────
+  const [toasts, setToasts] = useState([])
+  // Map of metric → timestamp when alert was last shown. Re-fires after ALERT_REFIRE_MS.
+  const ALERT_REFIRE_MS = 60_000  // 1 minute
+  const lastAlertTimeRef = useRef({})  // { [metric]: timestamp }
+
   useEffect(() => { injectKeyframes() }, [])
 
   // Always-current ref — interval never uses stale closure values
   const cropRef = useRef({ type: cropType, stage: cropStage })
   const abortRef = useRef(null)   // cancel in-flight fetch on rapid changes
+
+  const dismissToast = useCallback((id) => {
+    setToasts(prev => prev.filter(t => t.id !== id))
+  }, [])
 
   const fetchPrediction = async (type = cropRef.current.type, stage = cropRef.current.stage, isInitial = false) => {
     // Cancel any previous in-flight request
@@ -234,7 +399,30 @@ const AIRiskPrediction = () => {
       const url = `http://localhost:5000/api/ai/predict?crop_type=${type}&crop_stage=${stage}`
       const res = await fetch(url, { signal: ctrl.signal })
       if (!res.ok) throw new Error('Failed to fetch prediction')
-      setPrediction(await res.json())
+      const data = await res.json()
+      setPrediction(data)
+
+      // ── Handle alerts → toasts (re-fires every 1 min if condition persists) ──
+      const incoming = data.alerts ?? []
+      const now = Date.now()
+
+      // Clear timestamps for metrics that went back in range
+      Object.keys(lastAlertTimeRef.current).forEach(m => {
+        if (!incoming.find(a => a.metric === m)) delete lastAlertTimeRef.current[m]
+      })
+
+      // Fire toast if: never shown before, OR last shown > 1 min ago
+      const newToasts = incoming
+        .filter(a => {
+          const last = lastAlertTimeRef.current[a.metric]
+          return !last || (now - last) >= ALERT_REFIRE_MS
+        })
+        .map(a => ({ ...a, id: `${a.metric}-${now}` }))
+
+      if (newToasts.length > 0) {
+        newToasts.forEach(t => { lastAlertTimeRef.current[t.metric] = now })
+        setToasts(prev => [...newToasts, ...prev])
+      }
     } catch (err) {
       if (err.name !== 'AbortError') setError(err.message)
     } finally {
@@ -256,6 +444,9 @@ const AIRiskPrediction = () => {
     setCropType(type)
     setCropStage(stage)
     setPredicting(true)           // instant UI feedback — risk card dims immediately
+    // Reset toast timestamps — new crop has different thresholds
+    lastAlertTimeRef.current = {}
+    setToasts([])
     fetchPrediction(type, stage)
   }
 
@@ -281,322 +472,325 @@ const AIRiskPrediction = () => {
   }
 
   return (
-    <div className="dash-page" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <>
+      <AlertToastContainer toasts={toasts} onDismiss={dismissToast} />
+      <div className="dash-page" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-      {/* ── Page header ───────────────────────────────────────────────── */}
-      <div style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end',
-        borderBottom: '1px solid var(--c-border-strong)', paddingBottom: '10px',
-      }}>
-        <div>
-          <p style={{
-            fontSize: '11px', color: 'var(--c-text-tertiary)', textTransform: 'uppercase',
-            letterSpacing: '1px', marginBottom: '2px', fontFamily: 'var(--font-mono)'
-          }}>
-            AI Insights
-          </p>
-          <h2 style={{
-            fontSize: '20px', fontWeight: 800, textTransform: 'uppercase',
-            letterSpacing: '-0.5px', color: 'var(--c-text-primary)'
-          }}>
-            AI Risk Prediction
-          </h2>
-        </div>
-        <span style={{ fontSize: '11px', color: 'var(--c-text-tertiary)', fontFamily: 'var(--font-mono)' }}>
-          Live Monitoring
-        </span>
-      </div>
-
-      {/* ── Crop Configuration + Growth Visualizer (single row) ─────── */}
-      <div style={{ background: 'var(--c-surface)', border: '1px solid var(--c-border-strong)' }}>
-        <div className="panel-header">
-          <span className="panel-title">Crop Configuration</span>
-          <button
-            onClick={() => fetchPrediction(cropType, cropStage, false)}
-            className="action-btn"
-            style={{ fontFamily: 'var(--font-mono)' }}
-          >
-            Run Analysis
-          </button>
-        </div>
-
-        {/* Selectors + compact visualizer in one row */}
-        <div style={{ display: 'flex', gap: '0', alignItems: 'stretch' }}>
-
-          {/* Dropdowns — compact fixed width */}
-          <div style={{ flex: '0 0 260px', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '10px', justifyContent: 'center' }}>
-            <div className="form-group">
-              <label>Crop Type</label>
-              <select
-                value={cropType}
-                onChange={(e) => handleCropChange(e.target.value, cropStage)}
-                className="form-input"
-              >
-                {CROP_TYPES.map(t => <option key={t} value={t}>{cap(t)}</option>)}
-              </select>
-            </div>
-            <div className="form-group">
-              <label>Growth Stage</label>
-              <select
-                value={cropStage}
-                onChange={(e) => handleCropChange(cropType, e.target.value)}
-                className="form-input"
-              >
-                {CROP_STAGES.map(s => <option key={s} value={s}>{cap(s)}</option>)}
-              </select>
-            </div>
-          </div>
-
-          {/* Divider */}
-          <div style={{ width: '1px', background: 'var(--c-border-subtle)', margin: '12px 0' }} />
-
-          {/* Visualizer — gets remaining space */}
-          <div style={{ flex: 1, padding: '8px 8px 8px 0' }}>
-            <CompactVisualizer cropType={cropType} cropStage={cropStage} colors={colors} />
-          </div>
-
-        </div>
-      </div>
-
-      {/* ── Loading ───────────────────────────────────────────────────── */}
-      {loading && (
+        {/* ── Page header ───────────────────────────────────────────────── */}
         <div style={{
-          background: 'var(--c-surface)', border: '1px solid var(--c-border-strong)',
-          padding: '28px', textAlign: 'center',
-          fontSize: '13px', color: 'var(--c-text-secondary)', textTransform: 'uppercase',
-          letterSpacing: '1px', fontFamily: 'var(--font-mono)',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end',
+          borderBottom: '1px solid var(--c-border-strong)', paddingBottom: '10px',
         }}>
-          Analysing {cap(cropType)} · {cap(cropStage)} with AI…
+          <div>
+            <p style={{
+              fontSize: '11px', color: 'var(--c-text-tertiary)', textTransform: 'uppercase',
+              letterSpacing: '1px', marginBottom: '2px', fontFamily: 'var(--font-mono)'
+            }}>
+              AI Insights
+            </p>
+            <h2 style={{
+              fontSize: '20px', fontWeight: 800, textTransform: 'uppercase',
+              letterSpacing: '-0.5px', color: 'var(--c-text-primary)'
+            }}>
+              AI Risk Prediction
+            </h2>
+          </div>
+          <span style={{ fontSize: '11px', color: 'var(--c-text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+            Live Monitoring
+          </span>
         </div>
-      )}
 
-      {/* ── Error ────────────────────────────────────────────────────── */}
-      {error && (
-        <div style={{
-          background: 'var(--c-surface)', border: '1px solid var(--c-status-danger)',
-          borderLeft: '4px solid var(--c-status-danger)', padding: '16px',
-        }}>
-          <p style={{ fontSize: '13px', color: 'var(--c-status-danger)', fontWeight: 600 }}>
-            Error: {error}
-          </p>
-          <button onClick={() => fetchPrediction()} className="action-btn" style={{ marginTop: '10px' }}>
-            Retry
-          </button>
-        </div>
-      )}
-
-      {!loading && !error && prediction && (<>
-
-        {/* ── Live Sensor Readings ───────────────────────────────────── */}
+        {/* ── Crop Configuration + Growth Visualizer (single row) ─────── */}
         <div style={{ background: 'var(--c-surface)', border: '1px solid var(--c-border-strong)' }}>
           <div className="panel-header">
-            <span className="panel-title">Live Sensor Readings</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              {refreshing && (
-                <span style={{ fontSize: '11px', color: 'var(--c-text-tertiary)', fontFamily: 'var(--font-mono)' }}>
-                  Refreshing…
-                </span>
-              )}
-              <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--c-status-safe)', fontWeight: 600 }}>
-                {prediction.sensor_snapshot?.timestamp ?? '—'}
-              </span>
-            </div>
+            <span className="panel-title">Crop Configuration</span>
+            <button
+              onClick={() => fetchPrediction(cropType, cropStage, false)}
+              className="action-btn"
+              style={{ fontFamily: 'var(--font-mono)' }}
+            >
+              Run Analysis
+            </button>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)' }}>
 
-            <div className="kpi-box" style={{ borderRight: '1px solid var(--c-border-subtle)' }}>
-              <div>
-                <p className="kpi-label">Avg Temperature</p>
-                <p className="kpi-value">
-                  {prediction.sensor_snapshot?.temp?.toFixed(1) ?? '—'}
-                  <span className="kpi-unit">°C</span>
-                </p>
+          {/* Selectors + compact visualizer in one row */}
+          <div style={{ display: 'flex', gap: '0', alignItems: 'stretch' }}>
+
+            {/* Dropdowns — compact fixed width */}
+            <div style={{ flex: '0 0 260px', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '10px', justifyContent: 'center' }}>
+              <div className="form-group">
+                <label>Crop Type</label>
+                <select
+                  value={cropType}
+                  onChange={(e) => handleCropChange(e.target.value, cropStage)}
+                  className="form-input"
+                >
+                  {CROP_TYPES.map(t => <option key={t} value={t}>{cap(t)}</option>)}
+                </select>
               </div>
-              <span className="kpi-delta">Live</span>
+              <div className="form-group">
+                <label>Growth Stage</label>
+                <select
+                  value={cropStage}
+                  onChange={(e) => handleCropChange(cropType, e.target.value)}
+                  className="form-input"
+                >
+                  {CROP_STAGES.map(s => <option key={s} value={s}>{cap(s)}</option>)}
+                </select>
+              </div>
             </div>
 
-            <div className="kpi-box" style={{ borderRight: '1px solid var(--c-border-subtle)', borderLeft: 'none' }}>
-              <div>
-                <p className="kpi-label">Avg Humidity</p>
-                <p className="kpi-value">
-                  {prediction.sensor_snapshot?.humidity?.toFixed(1) ?? '—'}
-                  <span className="kpi-unit">%</span>
-                </p>
-              </div>
-              <span className="kpi-delta">Live</span>
-            </div>
+            {/* Divider */}
+            <div style={{ width: '1px', background: 'var(--c-border-subtle)', margin: '12px 0' }} />
 
-            <div className="kpi-box" style={{ borderLeft: 'none' }}>
-              <div>
-                <p className="kpi-label">Avg CO₂ Level</p>
-                <p className="kpi-value">
-                  {prediction.sensor_snapshot?.co2?.toFixed(0) ?? '—'}
-                  <span className="kpi-unit">ppm</span>
-                </p>
-              </div>
-              <span className="kpi-delta">Live</span>
+            {/* Visualizer — gets remaining space */}
+            <div style={{ flex: 1, padding: '8px 8px 8px 0' }}>
+              <CompactVisualizer cropType={cropType} cropStage={cropStage} colors={colors} />
             </div>
 
           </div>
         </div>
 
-        {/* ── Risk Assessment + AI Recommendations ──────────────────── */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-
-          {/* Risk Assessment — HERO */}
+        {/* ── Loading ───────────────────────────────────────────────────── */}
+        {loading && (
           <div style={{
-            background: 'var(--c-surface)',
-            border: `1px solid ${riskBorderColor(prediction.risk_level)}`,
-            borderLeft: `5px solid ${riskBorderColor(prediction.risk_level)}`,
-            position: 'relative', overflow: 'hidden',
-            transition: 'opacity 0.2s ease',
-            opacity: predicting ? 0.55 : 1,
+            background: 'var(--c-surface)', border: '1px solid var(--c-border-strong)',
+            padding: '28px', textAlign: 'center',
+            fontSize: '13px', color: 'var(--c-text-secondary)', textTransform: 'uppercase',
+            letterSpacing: '1px', fontFamily: 'var(--font-mono)',
           }}>
-            {/* Instant "predicting" overlay — shown as soon as dropdown changes */}
-            {predicting && (
-              <div style={{
-                position: 'absolute', inset: 0, zIndex: 10,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'rgba(255,255,255,0.55)',
-                backdropFilter: 'blur(2px)',
-              }}>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                  <div style={{
-                    width: '28px', height: '28px', border: '3px solid var(--c-border-subtle)',
-                    borderTop: `3px solid ${riskBorderColor(prediction.risk_level)}`,
-                    borderRadius: '50%',
-                    animation: 'gs-spin 0.7s linear infinite',
-                  }} />
-                  <span style={{
-                    fontSize: '11px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase',
-                    letterSpacing: '1px', color: 'var(--c-text-secondary)', fontWeight: 600,
-                  }}>
-                    Analysing {cap(cropType)} · {cap(cropStage)}…
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Faint bg wash */}
-            <div style={{
-              position: 'absolute', inset: 0,
-              background: riskBg(prediction.risk_level),
-              opacity: 0.45, pointerEvents: 'none',
-            }} />
-
-            <div className="panel-header" style={{ position: 'relative', zIndex: 1 }}>
-              <span className="panel-title">Risk Assessment</span>
-              {prediction.source && (
-                <span className="status-badge" style={{
-                  background: prediction.source === 'ml-model' ? '#e0f2fe' : 'var(--c-surface-muted)',
-                  color: prediction.source === 'ml-model' ? '#0369a1' : 'var(--c-text-secondary)',
-                  borderColor: prediction.source === 'ml-model' ? '#7dd3fc' : 'var(--c-border-strong)',
-                }}>
-                  {prediction.source === 'ml-model' ? 'ML Model' : 'Rule-based'}
-                </span>
-              )}
-            </div>
-
-            <div style={{ padding: '16px 20px 20px', display: 'flex', flexDirection: 'column', gap: '14px', position: 'relative', zIndex: 1 }}>
-
-              {/* Risk level pill + big score */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                <div style={{
-                  display: 'inline-flex', alignItems: 'center', gap: '6px',
-                  padding: '7px 20px',
-                  background: riskBorderColor(prediction.risk_level),
-                  color: 'white',
-                  fontWeight: 900, fontSize: '17px', textTransform: 'uppercase', letterSpacing: '1.5px',
-                  boxShadow: `0 4px 14px ${riskBorderColor(prediction.risk_level)}50`,
-                }}>
-                  {prediction.risk_level?.toLowerCase() === 'high' && '⚠ '}
-                  {prediction.risk_level?.toLowerCase() === 'moderate' && '⚡ '}
-                  {prediction.risk_level?.toLowerCase() === 'low' && '✓ '}
-                  {prediction.risk_level}
-                </div>
-
-                <div style={{ textAlign: 'right' }}>
-                  <p style={{
-                    fontSize: '42px', fontWeight: 900, fontFamily: 'var(--font-mono)',
-                    color: riskBorderColor(prediction.risk_level), lineHeight: 1,
-                  }}>
-                    {prediction.confidence_score}
-                    <span style={{ fontSize: '18px', fontWeight: 600, color: 'var(--c-text-tertiary)' }}>%</span>
-                  </p>
-                  <p style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--c-text-tertiary)', fontFamily: 'var(--font-mono)', marginTop: '2px' }}>
-                    Risk Score
-                  </p>
-                </div>
-              </div>
-
-              {/* Score bar */}
-              <div>
-                <div style={{ height: '7px', background: 'var(--c-border-subtle)', overflow: 'hidden' }}>
-                  <div style={{
-                    height: '100%',
-                    width: `${prediction.confidence_score}%`,
-                    background: `linear-gradient(90deg, ${riskBorderColor(prediction.risk_level)}77, ${riskBorderColor(prediction.risk_level)})`,
-                    transition: 'width 0.9s ease',
-                  }} />
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '3px' }}>
-                  <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--c-text-tertiary)' }}>0</span>
-                  <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--c-text-tertiary)' }}>100</span>
-                </div>
-              </div>
-
-              {/* Analysis */}
-              <p style={{
-                fontSize: '12px', color: 'var(--c-text-secondary)', lineHeight: 1.65,
-                borderTop: '1px solid var(--c-border-subtle)', paddingTop: '12px',
-              }}>
-                {prediction.analysis}
-              </p>
-            </div>
+            Analysing {cap(cropType)} · {cap(cropStage)} with AI…
           </div>
+        )}
 
+        {/* ── Error ────────────────────────────────────────────────────── */}
+        {error && (
+          <div style={{
+            background: 'var(--c-surface)', border: '1px solid var(--c-status-danger)',
+            borderLeft: '4px solid var(--c-status-danger)', padding: '16px',
+          }}>
+            <p style={{ fontSize: '13px', color: 'var(--c-status-danger)', fontWeight: 600 }}>
+              Error: {error}
+            </p>
+            <button onClick={() => fetchPrediction()} className="action-btn" style={{ marginTop: '10px' }}>
+              Retry
+            </button>
+          </div>
+        )}
 
-          {/* AI Recommendations */}
+        {!loading && !error && prediction && (<>
+
+          {/* ── Live Sensor Readings ───────────────────────────────────── */}
           <div style={{ background: 'var(--c-surface)', border: '1px solid var(--c-border-strong)' }}>
             <div className="panel-header">
-              <span className="panel-title">AI Recommendations</span>
-              <span style={{
-                fontSize: '11px', color: 'var(--c-text-tertiary)',
-                fontFamily: 'var(--font-mono)', fontWeight: 600,
-              }}>
-                {cap(cropType)} · {cap(cropStage)}
-              </span>
-            </div>
-            <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-              {prediction.recommendations.map((rec, i) => (
-                <li key={i} className="alert-item">
-                  <span className="alert-icon info" style={{
-                    fontSize: '11px', fontWeight: 700,
-                    fontFamily: 'var(--font-mono)', minWidth: '16px', textAlign: 'center'
-                  }}>
-                    {i + 1}
+              <span className="panel-title">Live Sensor Readings</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {refreshing && (
+                  <span style={{ fontSize: '11px', color: 'var(--c-text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                    Refreshing…
                   </span>
-                  <div className="alert-content">
-                    <p style={{ fontSize: '13px', fontWeight: 500, color: 'var(--c-text-primary)' }}>
-                      {rec}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
+                )}
+                <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--c-status-safe)', fontWeight: 600 }}>
+                  {prediction.sensor_snapshot?.timestamp ?? '—'}
+                </span>
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)' }}>
+
+              <div className="kpi-box" style={{ borderRight: '1px solid var(--c-border-subtle)' }}>
+                <div>
+                  <p className="kpi-label">Avg Temperature</p>
+                  <p className="kpi-value">
+                    {prediction.sensor_snapshot?.temp?.toFixed(1) ?? '—'}
+                    <span className="kpi-unit">°C</span>
+                  </p>
+                </div>
+                <span className="kpi-delta">Live</span>
+              </div>
+
+              <div className="kpi-box" style={{ borderRight: '1px solid var(--c-border-subtle)', borderLeft: 'none' }}>
+                <div>
+                  <p className="kpi-label">Avg Humidity</p>
+                  <p className="kpi-value">
+                    {prediction.sensor_snapshot?.humidity?.toFixed(1) ?? '—'}
+                    <span className="kpi-unit">%</span>
+                  </p>
+                </div>
+                <span className="kpi-delta">Live</span>
+              </div>
+
+              <div className="kpi-box" style={{ borderLeft: 'none' }}>
+                <div>
+                  <p className="kpi-label">Avg CO₂ Level</p>
+                  <p className="kpi-value">
+                    {prediction.sensor_snapshot?.co2?.toFixed(0) ?? '—'}
+                    <span className="kpi-unit">ppm</span>
+                  </p>
+                </div>
+                <span className="kpi-delta">Live</span>
+              </div>
+
+            </div>
           </div>
 
-        </div>
+          {/* ── Risk Assessment + AI Recommendations ──────────────────── */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
 
-        {/* Refresh */}
-        <div>
-          <button onClick={() => fetchPrediction(cropType, cropStage, false)} className="btn-ghost" disabled={refreshing}>
-            {refreshing ? 'Refreshing…' : 'Refresh Analysis'}
-          </button>
-        </div>
+            {/* Risk Assessment — HERO */}
+            <div style={{
+              background: 'var(--c-surface)',
+              border: `1px solid ${riskBorderColor(prediction.risk_level)}`,
+              borderLeft: `5px solid ${riskBorderColor(prediction.risk_level)}`,
+              position: 'relative', overflow: 'hidden',
+              transition: 'opacity 0.2s ease',
+              opacity: predicting ? 0.55 : 1,
+            }}>
+              {/* Instant "predicting" overlay — shown as soon as dropdown changes */}
+              {predicting && (
+                <div style={{
+                  position: 'absolute', inset: 0, zIndex: 10,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'rgba(255,255,255,0.55)',
+                  backdropFilter: 'blur(2px)',
+                }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                    <div style={{
+                      width: '28px', height: '28px', border: '3px solid var(--c-border-subtle)',
+                      borderTop: `3px solid ${riskBorderColor(prediction.risk_level)}`,
+                      borderRadius: '50%',
+                      animation: 'gs-spin 0.7s linear infinite',
+                    }} />
+                    <span style={{
+                      fontSize: '11px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase',
+                      letterSpacing: '1px', color: 'var(--c-text-secondary)', fontWeight: 600,
+                    }}>
+                      Analysing {cap(cropType)} · {cap(cropStage)}…
+                    </span>
+                  </div>
+                </div>
+              )}
 
-      </>)}
-    </div>
+              {/* Faint bg wash */}
+              <div style={{
+                position: 'absolute', inset: 0,
+                background: riskBg(prediction.risk_level),
+                opacity: 0.45, pointerEvents: 'none',
+              }} />
+
+              <div className="panel-header" style={{ position: 'relative', zIndex: 1 }}>
+                <span className="panel-title">Risk Assessment</span>
+                {prediction.source && (
+                  <span className="status-badge" style={{
+                    background: prediction.source === 'ml-model' ? '#e0f2fe' : 'var(--c-surface-muted)',
+                    color: prediction.source === 'ml-model' ? '#0369a1' : 'var(--c-text-secondary)',
+                    borderColor: prediction.source === 'ml-model' ? '#7dd3fc' : 'var(--c-border-strong)',
+                  }}>
+                    {prediction.source === 'ml-model' ? 'ML Model' : 'Rule-based'}
+                  </span>
+                )}
+              </div>
+
+              <div style={{ padding: '16px 20px 20px', display: 'flex', flexDirection: 'column', gap: '14px', position: 'relative', zIndex: 1 }}>
+
+                {/* Risk level pill + big score */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                  <div style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '6px',
+                    padding: '7px 20px',
+                    background: riskBorderColor(prediction.risk_level),
+                    color: 'white',
+                    fontWeight: 900, fontSize: '17px', textTransform: 'uppercase', letterSpacing: '1.5px',
+                    boxShadow: `0 4px 14px ${riskBorderColor(prediction.risk_level)}50`,
+                  }}>
+                    {prediction.risk_level?.toLowerCase() === 'high' && '⚠ '}
+                    {prediction.risk_level?.toLowerCase() === 'moderate' && '⚡ '}
+                    {prediction.risk_level?.toLowerCase() === 'low' && '✓ '}
+                    {prediction.risk_level}
+                  </div>
+
+                  <div style={{ textAlign: 'right' }}>
+                    <p style={{
+                      fontSize: '42px', fontWeight: 900, fontFamily: 'var(--font-mono)',
+                      color: riskBorderColor(prediction.risk_level), lineHeight: 1,
+                    }}>
+                      {prediction.confidence_score}
+                      <span style={{ fontSize: '18px', fontWeight: 600, color: 'var(--c-text-tertiary)' }}>%</span>
+                    </p>
+                    <p style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--c-text-tertiary)', fontFamily: 'var(--font-mono)', marginTop: '2px' }}>
+                      Risk Score
+                    </p>
+                  </div>
+                </div>
+
+                {/* Score bar */}
+                <div>
+                  <div style={{ height: '7px', background: 'var(--c-border-subtle)', overflow: 'hidden' }}>
+                    <div style={{
+                      height: '100%',
+                      width: `${prediction.confidence_score}%`,
+                      background: `linear-gradient(90deg, ${riskBorderColor(prediction.risk_level)}77, ${riskBorderColor(prediction.risk_level)})`,
+                      transition: 'width 0.9s ease',
+                    }} />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '3px' }}>
+                    <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--c-text-tertiary)' }}>0</span>
+                    <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--c-text-tertiary)' }}>100</span>
+                  </div>
+                </div>
+
+                {/* Analysis */}
+                <p style={{
+                  fontSize: '12px', color: 'var(--c-text-secondary)', lineHeight: 1.65,
+                  borderTop: '1px solid var(--c-border-subtle)', paddingTop: '12px',
+                }}>
+                  {prediction.analysis}
+                </p>
+              </div>
+            </div>
+
+
+            {/* AI Recommendations */}
+            <div style={{ background: 'var(--c-surface)', border: '1px solid var(--c-border-strong)' }}>
+              <div className="panel-header">
+                <span className="panel-title">AI Recommendations</span>
+                <span style={{
+                  fontSize: '11px', color: 'var(--c-text-tertiary)',
+                  fontFamily: 'var(--font-mono)', fontWeight: 600,
+                }}>
+                  {cap(cropType)} · {cap(cropStage)}
+                </span>
+              </div>
+              <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+                {prediction.recommendations.map((rec, i) => (
+                  <li key={i} className="alert-item">
+                    <span className="alert-icon info" style={{
+                      fontSize: '11px', fontWeight: 700,
+                      fontFamily: 'var(--font-mono)', minWidth: '16px', textAlign: 'center'
+                    }}>
+                      {i + 1}
+                    </span>
+                    <div className="alert-content">
+                      <p style={{ fontSize: '13px', fontWeight: 500, color: 'var(--c-text-primary)' }}>
+                        {rec}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+          </div>
+
+          {/* Refresh */}
+          <div>
+            <button onClick={() => fetchPrediction(cropType, cropStage, false)} className="btn-ghost" disabled={refreshing}>
+              {refreshing ? 'Refreshing…' : 'Refresh Analysis'}
+            </button>
+          </div>
+
+        </>)}
+      </div>
+    </>
   )
 }
 

@@ -1,11 +1,115 @@
+import os
 import requests
 from flask import Blueprint, jsonify, request
 from mqtt_service import get_latest_sensor_data
 from datetime import datetime, timezone
 
+try:
+    import google.generativeai as genai
+    _GENAI_AVAILABLE = True
+except ImportError:
+    _GENAI_AVAILABLE = False
+
 ai_bp = Blueprint('ai_bp', __name__)
 
 MODEL_URL = "http://localhost:5001/predict"
+
+# ── Crop ideal environmental ranges ─────────────────────────────────────────
+CROP_IDEAL_RANGES = {
+    "tomato":     {"temp": (20, 28), "humidity": (60, 80), "co2": (350, 800)},
+    "capsicum":   {"temp": (22, 30), "humidity": (65, 80), "co2": (350, 800)},
+    "cucumber":   {"temp": (22, 30), "humidity": (70, 85), "co2": (350, 900)},
+    "lettuce":    {"temp": (15, 24), "humidity": (50, 70), "co2": (350, 700)},
+    "strawberry": {"temp": (18, 26), "humidity": (60, 80), "co2": (350, 800)},
+}
+
+# ── Hardcoded fallback suggestions per metric ───────────────────────────────
+_FALLBACK_SUGGESTIONS = {
+    "temp_high":     "Activate cooling or increase ventilation to lower temperature.",
+    "temp_low":      "Use a heater or reduce ventilation to raise temperature.",
+    "humidity_high": "Increase airflow or run dehumidifier to reduce humidity.",
+    "humidity_low":  "Mist plants or use a humidifier to raise humidity.",
+    "co2_high":      "Open vents or add fans to dilute excess CO₂ buildup.",
+    "co2_low":       "Seal greenhouse gaps; add CO₂ enrichment if available.",
+}
+
+
+def _check_alerts(sensor: dict, crop_type: str, crop_stage: str) -> list:
+    """
+    Compare sensor readings against CROP_IDEAL_RANGES[crop_type].
+    Returns list of alert dicts with metric, value, ideal range, severity, and message.
+    """
+    ranges = CROP_IDEAL_RANGES.get(crop_type, CROP_IDEAL_RANGES["lettuce"])
+    alerts = []
+
+    checks = [
+        ("temp",     float(sensor.get("temp", 0)),     "°C",  "temperature"),
+        ("humidity", float(sensor.get("humidity", 0)), "%",   "humidity"),
+        ("co2",      float(sensor.get("co2", 0)),      " ppm", "CO₂"),
+    ]
+
+    for key, value, unit, label in checks:
+        lo, hi = ranges[key]
+        if value < lo:
+            span = hi - lo
+            severity = "critical" if (lo - value) > 0.25 * span else "warning"
+            alerts.append({
+                "metric":    key,
+                "label":     label,
+                "value":     value,
+                "unit":      unit,
+                "ideal_min": lo,
+                "ideal_max": hi,
+                "direction": "low",
+                "severity":  severity,
+                "message":   f"{label} {value:.1f}{unit} below ideal ({lo}–{hi}{unit})",
+            })
+        elif value > hi:
+            span = hi - lo
+            severity = "critical" if (value - hi) > 0.25 * span else "warning"
+            alerts.append({
+                "metric":    key,
+                "label":     label,
+                "value":     value,
+                "unit":      unit,
+                "ideal_min": lo,
+                "ideal_max": hi,
+                "direction": "high",
+                "severity":  severity,
+                "message":   f"{label} {value:.1f}{unit} above ideal ({lo}–{hi}{unit})",
+            })
+
+    return alerts
+
+
+def _gemini_suggestion(alert: dict, crop_type: str, crop_stage: str) -> str:
+    """
+    Call Gemini API server-side to get a one-line actionable fix.
+    Falls back to a hardcoded suggestion if key is absent or call fails.
+    """
+    fallback_key = f"{alert['metric']}_{alert['direction']}"
+    fallback = _FALLBACK_SUGGESTIONS.get(fallback_key, "Check and adjust environmental controls.")
+
+    api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+    if not api_key or not _GENAI_AVAILABLE:
+        return fallback
+
+    try:
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel("gemini-2.0-flash")
+        prompt = (
+            f"My {crop_type} crop (stage: {crop_stage}) has {alert['label']} reading "
+            f"of {alert['value']:.1f}{alert['unit']} "
+            f"(ideal: {alert['ideal_min']}–{alert['ideal_max']}{alert['unit']}). "
+            "Give one short actionable fix in under 20 words."
+        )
+        response = model.generate_content(prompt)
+        text = response.text.strip()
+        # Cap at 120 chars to ensure it fits in the toast
+        return text[:120] if text else fallback
+    except Exception as exc:
+        print(f"[AI] Gemini suggestion failed: {exc}")
+        return fallback
 
 
 def _status_to_risk_level(status: str) -> str:
@@ -131,11 +235,17 @@ def predict_risk():
         risk_level, confidence, analysis, recommendations = _rule_based(co2, temp, humidity)
         source = "rule-based-fallback"
 
+    # ── Alert engine ─────────────────────────────────────────────────────────
+    alerts = _check_alerts(sensor, crop_type, crop_stage)
+    for alert in alerts:
+        alert["suggestion"] = _gemini_suggestion(alert, crop_type, crop_stage)
+
     return jsonify({
         "risk_level":       risk_level,
         "confidence_score": confidence,
         "analysis":         analysis,
         "recommendations":  recommendations,
+        "alerts":           alerts,
         "sensor_snapshot": {
             "co2":       co2,
             "temp":      temp,
