@@ -9,7 +9,46 @@ import {
   ResponsiveContainer,
   Legend
 } from 'recharts'
+import * as XLSX from 'xlsx'
 import './Dashboard.css'
+
+/* ── Export helpers ─────────────────────────────────────────── */
+const toRows = (data) =>
+  data.map(r => ({
+    Timestamp: r.timestamp ?? '',
+    'Temp (°C)': r.temp ?? '',
+    'Humidity (%)': r.humidity ?? '',
+    'CO2 (ppm)': r.co2 ?? '',
+  }))
+
+const fileName = (ext) => {
+  const d = new Date()
+  const pad = n => String(n).padStart(2, '0')
+  return `ecogrow_sensor_report_${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}.${ext}`
+}
+
+const downloadCSV = (data) => {
+  const rows = toRows(data)
+  const header = Object.keys(rows[0])
+  const csv = [
+    header.join(','),
+    ...rows.map(r => header.map(k => `"${String(r[k]).replace(/"/g, '""')}"`).join(','))
+  ].join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = fileName('csv')
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+const downloadExcel = (data) => {
+  const ws = XLSX.utils.json_to_sheet(toRows(data))
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Sensor Report')
+  XLSX.writeFile(wb, fileName('xlsx'))
+}
 
 const Reports = () => {
   const [reportsData, setReportsData] = useState([])
@@ -93,6 +132,25 @@ const Reports = () => {
         <div className="section-main" style={{ borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
           <header className="panel-header" style={{ marginBottom: '0' }}>
             <span className="panel-title">Detailed Sensor Logs</span>
+            {/* Download buttons — export all rows, not just current page */}
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                className="action-btn"
+                disabled={reportsData.length === 0}
+                onClick={() => downloadCSV(tableData)}
+                style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px' }}
+              >
+                ⬇ CSV
+              </button>
+              <button
+                className="action-btn"
+                disabled={reportsData.length === 0}
+                onClick={() => downloadExcel(tableData)}
+                style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', background: 'var(--c-status-safe)', borderColor: 'var(--c-status-safe)', color: 'white' }}
+              >
+                ⬇ Excel
+              </button>
+            </div>
           </header>
 
           <div className="placeholder-card" style={{ padding: '0', overflow: 'hidden' }}>

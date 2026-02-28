@@ -22,6 +22,11 @@ const DashboardHome = () => {
   })
   const [sensorHistory, setSensorHistory] = useState([])
 
+  // ── Live AI risk state ──────────────────────────────────────────
+  const [aiRisk, setAiRisk] = useState(null)
+  const [aiLoading, setAiLoading] = useState(true)
+  const [recentAlerts, setRecentAlerts] = useState([])
+
   // Calculate trends (simple comparison with previous data point)
   const getTrend = (current, key) => {
     if (sensorHistory.length < 2) return 'neutral'
@@ -97,6 +102,39 @@ const DashboardHome = () => {
         newSocket.disconnect()
       }
     }
+  }, [])
+
+  // ── Fetch AI risk prediction (auto-refresh every 30s) ────────────────
+  useEffect(() => {
+    const fetchRisk = async () => {
+      try {
+        const res = await fetch('http://localhost:5000/api/ai/predict?crop_type=lettuce&crop_stage=vegetative')
+        if (res.ok) setAiRisk(await res.json())
+      } catch (e) {
+        console.error('AI risk fetch failed:', e)
+      } finally {
+        setAiLoading(false)
+      }
+    }
+    fetchRisk()
+    const id = setInterval(fetchRisk, 30_000)
+    return () => clearInterval(id)
+  }, [])
+
+  // ── Fetch last 4 alert logs for System Logs panel ───────────────────
+  useEffect(() => {
+    const fetchRecentAlerts = async () => {
+      try {
+        const res = await fetch('http://localhost:5000/api/alerts?limit=4&offset=0')
+        if (res.ok) {
+          const data = await res.json()
+          setRecentAlerts(data.alerts ?? [])
+        }
+      } catch (e) { /* silent — System Logs still shows fallback */ }
+    }
+    fetchRecentAlerts()
+    const id = setInterval(fetchRecentAlerts, 30_000)
+    return () => clearInterval(id)
   }, [])
 
   const metrics = [
@@ -284,23 +322,65 @@ const DashboardHome = () => {
 
       {/* Side Panel: AI & Alerts */}
       <aside className="section-side">
-        {/* AI Insight */}
+        {/* AI Insight — live from /api/ai/predict */}
         <div className="side-panel ai-box">
-          <div className="ai-status">AI Risk Analysis: LOW</div>
-          <p className="ai-desc">
-            Predictive model indicates stable growth conditions for next 24h. No anomalies detected in Zone A.
-          </p>
-          <div style={{ marginTop: '12px' }}>
-            <button className="action-btn" style={{ borderColor: '#6366f1', color: '#4338ca' }}>View Report</button>
+          {aiLoading ? (
+            <div className="ai-status" style={{ opacity: 0.5 }}>AI Risk Analysis: Loading…</div>
+          ) : aiRisk ? (
+            <>
+              <div className="ai-status" style={{
+                color:
+                  aiRisk.risk_level?.toLowerCase() === 'high' ? '#ef4444' :
+                    aiRisk.risk_level?.toLowerCase() === 'moderate' ? '#f59e0b' : '#10b981',
+              }}>
+                AI Risk Analysis: {aiRisk.risk_level?.toUpperCase()}
+              </div>
+
+              {/* Analysis text — dark and bold */}
+              <p className="ai-desc" style={{ marginTop: '6px', color: 'var(--c-text-primary)' }}>
+                {aiRisk.analysis}
+              </p>
+
+              {/* Confidence bar */}
+              <div style={{ margin: '8px 0 4px', height: '5px', background: 'var(--c-border-subtle)' }}>
+                <div style={{
+                  height: '100%',
+                  width: `${aiRisk.confidence_score ?? 0}%`,
+                  background:
+                    aiRisk.risk_level?.toLowerCase() === 'high' ? '#ef4444' :
+                      aiRisk.risk_level?.toLowerCase() === 'moderate' ? '#f59e0b' : '#10b981',
+                  transition: 'width 0.8s ease',
+                }} />
+              </div>
+
+              {/* Confidence label */}
+              <p style={{ fontSize: '11px', color: 'var(--c-text-secondary)', fontFamily: 'var(--font-mono)', marginBottom: '10px' }}>
+                Confidence: <span style={{ fontWeight: 700, color: 'var(--c-text-primary)' }}>{aiRisk.confidence_score}%</span>
+                {' '}· {aiRisk.source === 'ml-model' ? 'ML Model' : 'Rule-based'}
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="ai-status">AI Risk Analysis: —</div>
+              <p className="ai-desc">Waiting for sensor data…</p>
+            </>
+          )}
+
+          <div style={{ marginTop: '4px' }}>
+            <a href="/dashboard/ai-risk" style={{ textDecoration: 'none' }}>
+              <button className="action-btn" style={{ borderColor: '#6366f1', color: '#4338ca' }}>View Report</button>
+            </a>
           </div>
         </div>
 
-        {/* System Alerts */}
+        {/* System Logs — last 4 crop alerts */}
         <div className="side-panel">
           <header className="panel-header">
             <span className="panel-title">System Logs</span>
+            <a href="/dashboard/alerts" style={{ fontSize: '10px', color: 'var(--c-text-tertiary)', fontFamily: 'var(--font-mono)', textDecoration: 'none' }}>View all →</a>
           </header>
           <ul className="alert-list">
+            {/* Always show System Online first */}
             <li className="alert-item">
               <div className="alert-icon">ℹ</div>
               <div className="alert-content">
@@ -308,6 +388,34 @@ const DashboardHome = () => {
                 <span className="alert-time">Now</span>
               </div>
             </li>
+            {recentAlerts.map(a => {
+              const timeAgo = (() => {
+                const diff = Math.floor((Date.now() - new Date(a.created_at + 'Z')) / 1000)
+                if (diff < 60) return `${diff}s ago`
+                if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+                return `${Math.floor(diff / 3600)}h ago`
+              })()
+              return (
+                <li key={a.id} className="alert-item">
+                  <div className={`alert-icon ${a.severity}`} style={{ fontSize: '11px', fontWeight: 700 }}>
+                    {a.severity === 'critical' ? '!!' : '!'}
+                  </div>
+                  <div className="alert-content">
+                    <p style={{ fontWeight: 600 }}>{a.message}</p>
+                    <span className="alert-time">{timeAgo} · {a.crop_type}</span>
+                  </div>
+                </li>
+              )
+            })}
+            {recentAlerts.length === 0 && (
+              <li className="alert-item">
+                <div className="alert-icon">✓</div>
+                <div className="alert-content">
+                  <p>No alerts recorded yet</p>
+                  <span className="alert-time">All readings in range</span>
+                </div>
+              </li>
+            )}
           </ul>
         </div>
       </aside>

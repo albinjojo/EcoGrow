@@ -3,6 +3,7 @@ import requests
 from flask import Blueprint, jsonify, request
 from mqtt_service import get_latest_sensor_data
 from datetime import datetime, timezone
+from db_connect import get_connection
 
 try:
     import google.generativeai as genai
@@ -239,6 +240,7 @@ def predict_risk():
     alerts = _check_alerts(sensor, crop_type, crop_stage)
     for alert in alerts:
         alert["suggestion"] = _gemini_suggestion(alert, crop_type, crop_stage)
+    _save_alerts_to_db(alerts, crop_type, crop_stage)
 
     return jsonify({
         "risk_level":       risk_level,
@@ -257,3 +259,84 @@ def predict_risk():
         "timestamp":  datetime.now(timezone.utc).isoformat(),
         "source":     source,
     }), 200
+
+
+def _save_alerts_to_db(alerts: list, crop_type: str, crop_stage: str):
+    """Persist each alert to the crop_alerts table."""
+    if not alerts:
+        return
+    try:
+        conn = get_connection()
+        cur  = conn.cursor()
+        cur.executemany(
+            """
+            INSERT INTO crop_alerts
+              (metric, value, ideal_min, ideal_max, severity, message, suggestion, crop_type, crop_stage)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            [
+                (
+                    a["metric"], a["value"], a["ideal_min"], a["ideal_max"],
+                    a["severity"], a["message"], a.get("suggestion", ""),
+                    crop_type, crop_stage,
+                )
+                for a in alerts
+            ],
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception as exc:
+        print(f"[AI] Failed to save alerts to DB: {exc}")
+
+
+@ai_bp.route('/api/alerts', methods=['GET'])
+def get_alerts():
+    """
+    Return paginated alert history from crop_alerts.
+    Query params:
+        limit  – rows per page (default 50)
+        offset – starting row   (default 0)
+    """
+    limit  = min(int(request.args.get("limit", 50)), 200)
+    offset = int(request.args.get("offset", 0))
+    try:
+        conn = get_connection()
+        cur  = conn.cursor()
+        cur.execute(
+            """
+            SELECT id, metric, value, ideal_min, ideal_max, severity,
+                   message, suggestion, crop_type, crop_stage, created_at
+            FROM crop_alerts
+            ORDER BY created_at DESC
+            LIMIT %s OFFSET %s
+            """,
+            (limit, offset),
+        )
+        rows = cur.fetchall()
+        # total count for pagination
+        cur.execute("SELECT COUNT(*) FROM crop_alerts")
+        total = cur.fetchone()[0]
+        cur.close()
+        conn.close()
+
+        alerts = [
+            {
+                "id":         r[0],
+                "metric":     r[1],
+                "value":      r[2],
+                "ideal_min":  r[3],
+                "ideal_max":  r[4],
+                "severity":   r[5],
+                "message":    r[6],
+                "suggestion": r[7],
+                "crop_type":  r[8],
+                "crop_stage": r[9],
+                "created_at": r[10].isoformat() if r[10] else None,
+            }
+            for r in rows
+        ]
+        return jsonify({"alerts": alerts, "total": total, "limit": limit, "offset": offset}), 200
+    except Exception as exc:
+        print(f"[AI] Failed to fetch alerts: {exc}")
+        return jsonify({"alerts": [], "total": 0, "error": str(exc)}), 500
