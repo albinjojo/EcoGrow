@@ -418,7 +418,7 @@ def get_alerts():
                 "suggestion": r[7],
                 "crop_type":  r[8],
                 "crop_stage": r[9],
-                "created_at": r[10].isoformat() if r[10] else None,
+                "created_at": r[10].isoformat() + 'Z' if r[10] else None,
             }
             for r in rows
         ]
@@ -473,7 +473,7 @@ def get_admin_alerts():
                 "suggestion": r[8],
                 "crop_type":  r[9],
                 "crop_stage": r[10],
-                "created_at": r[11].isoformat() if r[11] else None,
+                "created_at": r[11].isoformat() + 'Z' if r[11] else None,
                 "user_email": r[12],
                 "user_name":  r[12],  # use email as display name
             }

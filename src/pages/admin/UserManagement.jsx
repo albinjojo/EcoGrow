@@ -152,55 +152,94 @@ const UserManagement = () => {
   )
 
   return (
-    <div className="admin-page">
-      {/* Page Header */}
-      <section className="page-header">
-        <div className="header-content">
-          <h2>User Management</h2>
-          <p className="header-subtitle">Manage farmer accounts and administrative users</p>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '1200px', margin: '0 auto' }}>
+
+      {/* ── Page Header ───────────────────────────────────────────────── */}
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        padding: '14px 20px',
+        background: 'var(--c-surface)',
+        border: '1px solid var(--c-border-strong)',
+        borderLeft: '4px solid var(--c-accent-primary)',
+      }}>
+        <div>
+          <p style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--c-text-tertiary)', fontFamily: 'var(--font-mono)', marginBottom: '2px' }}>
+            Admin › Users
+          </p>
+          <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--c-text-primary)', margin: 0, letterSpacing: '-0.3px' }}>
+            User Management
+          </h2>
         </div>
-        <button className="primary-btn" onClick={handleAddUser} disabled={loading}>
-          + Add New User
+        <button
+          onClick={handleAddUser}
+          disabled={loading}
+          style={{
+            padding: '8px 18px', background: 'var(--c-accent-primary)',
+            border: '1px solid #2d5a27', color: 'white',
+            fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 700,
+            textTransform: 'uppercase', letterSpacing: '0.5px',
+            cursor: 'pointer', transition: 'opacity 0.15s',
+            opacity: loading ? 0.6 : 1,
+          }}
+        >
+          + Add User
         </button>
-      </section>
+      </div>
 
-      {/* Error Message */}
+      {/* ── Error ─────────────────────────────────────────────────────── */}
       {error && (
-        <section className="alert alert-error">
-          <p>Error loading users: {error}</p>
-        </section>
+        <div style={{ padding: '12px 16px', background: '#fee2e2', border: '1px solid #fca5a5', color: '#991b1b', fontSize: '13px' }}>
+          Error loading users: {error}
+        </div>
       )}
 
-      {/* Loading State */}
-      {loading ? (
-        <section className="page-content">
-          <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
-            <p>Loading users...</p>
-          </div>
-        </section>
-      ) : (
-        <>
-          {/* Search and Filter */}
-          <section className="page-controls">
-            <input
-              type="search"
-              placeholder="Search by name or email..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="search-input"
-              aria-label="Search users"
-            />
-            <div className="control-stats">
-              Showing {filteredUsers.length} of {users.length} users
-            </div>
-          </section>
-
-          {/* Users Table */}
-          <section className="page-content">
-            <DataTable columns={columns} rows={filteredUsers} actions={actions} />
-          </section>
-        </>
+      {/* ── Search + Count Bar ────────────────────────────────────────── */}
+      {!loading && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '12px',
+          padding: '10px 16px',
+          background: 'var(--c-surface-muted)',
+          border: '1px solid var(--c-border-strong)',
+        }}>
+          <span style={{ fontSize: '14px', color: 'var(--c-text-tertiary)' }}>🔍</span>
+          <input
+            type="search"
+            placeholder="Search by name or email…"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            aria-label="Search users"
+            style={{
+              flex: 1, background: 'transparent', border: 'none', outline: 'none',
+              fontSize: '13px', color: 'var(--c-text-primary)',
+              fontFamily: 'var(--font-primary)',
+            }}
+          />
+          <span style={{
+            fontSize: '10px', fontWeight: 700, fontFamily: 'var(--font-mono)',
+            color: 'var(--c-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.5px',
+            background: 'var(--c-bg-app)', border: '1px solid var(--c-border-subtle)',
+            padding: '2px 8px', whiteSpace: 'nowrap',
+          }}>
+            {filteredUsers.length} / {users.length} users
+          </span>
+        </div>
       )}
+
+      {/* ── Loading ───────────────────────────────────────────────────── */}
+      {loading && (
+        <div style={{ textAlign: 'center', padding: '48px', color: 'var(--c-text-tertiary)', fontSize: '13px' }}>
+          Loading users…
+        </div>
+      )}
+
+      {/* ── Users Table ───────────────────────────────────────────────── */}
+      {!loading && (
+        <div style={{ background: 'var(--c-surface)', border: '1px solid var(--c-border-strong)', overflow: 'hidden' }}>
+          <DataTable columns={columns} rows={filteredUsers} actions={actions} />
+        </div>
+      )}
+
+
 
       {/* Add User Modal */}
       <Modal
