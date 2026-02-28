@@ -296,7 +296,8 @@ def _save_alerts_to_db(alerts: list, crop_type: str, crop_stage: str, user_id):
 
 def _fetch_crop_thresholds_from_db(user_id, crop_name: str) -> dict | None:
     """
-    Look up crop_thresholds for the given user and crop name.
+    Look up crop_thresholds by crop_name.
+    crop_thresholds table: (id, crop_name, temp_min, temp_max, humidity_min, humidity_max, co2_min, co2_max, ...)
     Returns a dict { 'temp': (min, max), 'humidity': (min, max), 'co2': (min, max) }
     or None if not found (caller falls back to CROP_IDEAL_RANGES).
     """
@@ -306,15 +307,14 @@ def _fetch_crop_thresholds_from_db(user_id, crop_name: str) -> dict | None:
         cur = conn.cursor()
         cur.execute(
             """
-            SELECT ct.temp_min, ct.temp_max,
-                   ct.humidity_min, ct.humidity_max,
-                   ct.co2_min, ct.co2_max
-            FROM crop_thresholds ct
-            JOIN crops c ON c.id = ct.crop_id
-            WHERE c.user_id = %s AND LOWER(c.name) = LOWER(%s) AND c.status = 'active'
+            SELECT temp_min, temp_max,
+                   humidity_min, humidity_max,
+                   co2_min, co2_max
+            FROM crop_thresholds
+            WHERE LOWER(crop_name) = LOWER(%s)
             LIMIT 1
             """,
-            (user_id, crop_name)
+            (crop_name,)
         )
         row = cur.fetchone()
         cur.close()
@@ -430,6 +430,62 @@ def get_alerts():
         if conn:
             conn.close()
 
+
+@ai_bp.route('/api/admin/alerts', methods=['GET'])
+def get_admin_alerts():
+    """
+    Return all alerts from crop_alerts joined with users table.
+    For admin view — no user_id filter, shows every user's alerts.
+    Returns a flat list (not paginated) ordered by created_at DESC.
+    Optional query param:
+        limit – max rows (default 200)
+    """
+    limit = min(int(request.args.get("limit", 200)), 500)
+    conn = None
+    try:
+        conn = get_connection()
+        cur  = conn.cursor()
+        cur.execute(
+            """
+            SELECT ca.id, ca.user_id, ca.metric, ca.value,
+                   ca.ideal_min, ca.ideal_max, ca.severity,
+                   ca.message, ca.suggestion, ca.crop_type, ca.crop_stage, ca.created_at,
+                   u.email AS user_email
+            FROM crop_alerts ca
+            LEFT JOIN users u ON u.id = ca.user_id
+            ORDER BY ca.created_at DESC
+            LIMIT %s
+            """,
+            (limit,)
+        )
+        rows = cur.fetchall()
+        cur.close()
+        alerts = [
+            {
+                "id":         r[0],
+                "user_id":    r[1],
+                "metric":     r[2],
+                "value":      float(r[3]) if r[3] is not None else None,
+                "ideal_min":  float(r[4]) if r[4] is not None else None,
+                "ideal_max":  float(r[5]) if r[5] is not None else None,
+                "severity":   r[6],
+                "message":    r[7],
+                "suggestion": r[8],
+                "crop_type":  r[9],
+                "crop_stage": r[10],
+                "created_at": r[11].isoformat() if r[11] else None,
+                "user_email": r[12],
+                "user_name":  r[12],  # use email as display name
+            }
+            for r in rows
+        ]
+        return jsonify(alerts), 200
+    except Exception as exc:
+        print(f"[AI] Failed to fetch admin alerts: {exc}")
+        return jsonify({"message": "Database error"}), 500
+    finally:
+        if conn:
+            conn.close()
 
 @ai_bp.route('/api/analytics/summary', methods=['GET'])
 def get_analytics_summary():

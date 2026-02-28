@@ -2,77 +2,77 @@ import { useState, useEffect } from 'react'
 import StatCard from '../../components/admin/StatCard'
 import { fetchAllUsers } from '../../services/api'
 
-/**
- * AdminDashboard - Overview of system metrics and health
- * Displays:
- * - Total users count (from database)
- * - Total devices count
- * - Active alerts count
- * - System health status
- * - Quick action buttons
- */
-const AdminDashboard = () => {
-  const [stats, setStats] = useState({
-    totalUsers: 0,
-    totalDevices: 18, // Will be fetched when device API is available
-    activeAlerts: 3,  // Will be fetched when alerts API is available
-    systemHealth: 98,
-  })
+function timeAgo(dateStr) {
+  if (!dateStr) return ''
+  const diff = Math.max(0, Math.floor((Date.now() - new Date(dateStr)) / 1000))
+  if (diff < 60) return `${diff}s ago`
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
+  return `${Math.floor(diff / 86400)}d ago`
+}
 
+const METRIC_LABEL = { temp: 'Temperature', humidity: 'Humidity', co2: 'CO₂' }
+
+const AdminDashboard = () => {
+  const [totalUsers, setTotalUsers] = useState(0)
+  const [healthScore, setHealthScore] = useState(null)
+  const [totalAlertsCount, setTotalAlertsCount] = useState(0)
+  const [activeAlerts, setActiveAlerts] = useState([])   // last 3 for display
   const [recentUsers, setRecentUsers] = useState([])
   const [loading, setLoading] = useState(true)
 
-  // Fetch user statistics from API
-  useEffect(() => {
-    const loadStats = async () => {
-      try {
-        const response = await fetchAllUsers()
-        const users = response.users || []
-
-        // Update total users count
-        setStats((prev) => ({
-          ...prev,
-          totalUsers: users.length,
-        }))
-
-        // Get 3 most recent users for the dashboard
-        const recent = users.slice(0, 3).map((user) => ({
-          id: user.id,
-          name: user.email.split('@')[0],
-          email: user.email,
-          role: user.role,
-          joined: new Date(user.createdAt).toISOString().split('T')[0],
-        }))
-        setRecentUsers(recent)
-      } catch (err) {
-        console.error('Error loading dashboard stats:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    loadStats()
-  }, [])
-
-  // Mock active alerts
-  const activeAlerts = [
-    { id: 1, device: 'Sensor A-1', severity: 'high', message: 'Temperature exceeds threshold', time: '5 min ago' },
-    { id: 2, device: 'Sensor B-2', severity: 'medium', message: 'Humidity level low', time: '15 min ago' },
-    { id: 3, device: 'Device C-3', severity: 'low', message: 'Device offline', time: '2 hours ago' },
-  ]
-
-  const handleRefresh = () => {
+  const loadAll = async () => {
     setLoading(true)
-    window.location.reload()
+    try {
+      // 1. Users
+      const usersRes = await fetchAllUsers()
+      const users = usersRes.users || []
+      setTotalUsers(users.length)
+      setRecentUsers(
+        users.slice(0, 3).map(u => ({
+          id: u.id,
+          email: u.email,
+          role: u.role,
+          joined: new Date(u.createdAt).toISOString().split('T')[0],
+        }))
+      )
+
+      // 2. Alerts
+      const alertsRes = await fetch('http://localhost:5000/api/admin/alerts')
+      if (alertsRes.ok) {
+        const alertData = await alertsRes.json()
+        const arr = Array.isArray(alertData) ? alertData : []
+        setTotalAlertsCount(arr.length)
+        setActiveAlerts(arr.slice(0, 3))
+      }
+
+      // 3. System health
+      const sumRes = await fetch('http://localhost:5000/api/analytics/summary')
+      if (sumRes.ok) {
+        const sumData = await sumRes.json()
+        setHealthScore(sumData.health_score ?? null)
+      }
+    } catch (err) {
+      console.error('Admin dashboard load error:', err)
+    } finally {
+      setLoading(false)
+    }
   }
+
+  useEffect(() => {
+    loadAll()
+    const id = setInterval(loadAll, 30_000)
+    return () => clearInterval(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
     <div className="admin-dashboard">
-      {/* System Overview Section */}
+      {/* System Overview */}
       <section className="dashboard-section">
         <div className="section-header">
           <h2>System Overview</h2>
-          <button className="secondary-btn" onClick={handleRefresh} disabled={loading}>
+          <button className="secondary-btn" onClick={loadAll} disabled={loading}>
             REFRESH
           </button>
         </div>
@@ -80,61 +80,59 @@ const AdminDashboard = () => {
         <div className="stats-grid">
           <StatCard
             title="Total Users"
-            value={loading ? '...' : stats.totalUsers}
+            value={loading ? '...' : totalUsers}
             subtitle="Active farmer accounts"
-            trend={{ direction: 'up', text: '+5 this month' }}
+            trend={{ direction: 'up', text: 'All time' }}
             variant="users"
           />
           <StatCard
-            title="Total Devices"
-            value={stats.totalDevices}
-            subtitle="IoT sensors & hardware"
-            trend={{ direction: 'up', text: '+2 this month' }}
-            variant="devices"
-          />
-          <StatCard
             title="Active Alerts"
-            value={stats.activeAlerts}
-            subtitle="Require attention"
-            trend={{ direction: 'down', text: '-1 from yesterday' }}
+            value={loading ? '...' : totalAlertsCount}
+            subtitle="Latest sensor alerts"
+            trend={{ direction: totalAlertsCount > 5 ? 'down' : 'up', text: totalAlertsCount > 5 ? 'Attention needed' : 'In range' }}
             variant="alerts"
           />
           <StatCard
             title="System Health"
-            value={`${stats.systemHealth}%`}
-            subtitle="Overall uptime"
+            value={loading || healthScore === null ? '...' : `${healthScore}%`}
+            subtitle="Based on alert rate"
             variant="health"
           />
         </div>
       </section>
 
-      {/* Active Alerts Section */}
+      {/* Active Alerts */}
       <section className="dashboard-section">
         <div className="section-header">
-          <h2>Active Alerts</h2>
-          <a href="/admin/alerts" className="link-btn">
-            View all →
-          </a>
+          <h2>Recent Alerts</h2>
+          <a href="/admin/alerts" className="link-btn">View all →</a>
         </div>
 
         <div className="alerts-container">
-          {activeAlerts.length === 0 ? (
+          {loading ? (
+            <p style={{ padding: '16px', color: '#666' }}>Loading alerts…</p>
+          ) : activeAlerts.length === 0 ? (
             <div className="empty-state">
-              <p>No active alerts. System running smoothly.</p>
+              <p>No alerts recorded yet. System running smoothly.</p>
             </div>
           ) : (
             <ul className="alerts-list">
               {activeAlerts.map((alert) => (
-                <li key={alert.id} className={`alert-item alert-severity-${alert.severity}`}>
+                <li
+                  key={alert.id}
+                  className={`alert-item alert-severity-${alert.severity === 'critical' ? 'high' : 'medium'}`}
+                >
                   <div className="alert-content">
-                    <p className="alert-device">{alert.device}</p>
+                    <p className="alert-device">
+                      {METRIC_LABEL[alert.metric] || alert.metric} · {alert.user_name || alert.user_email || `User ${alert.user_id}`}
+                    </p>
                     <p className="alert-message">{alert.message}</p>
                   </div>
                   <div className="alert-meta">
-                    <span className={`alert-badge alert-badge-${alert.severity}`}>
+                    <span className={`alert-badge alert-badge-${alert.severity === 'critical' ? 'high' : 'medium'}`}>
                       {alert.severity}
                     </span>
-                    <span className="alert-time">{alert.time}</span>
+                    <span className="alert-time">{timeAgo(alert.created_at)}</span>
                   </div>
                 </li>
               ))}
@@ -143,13 +141,11 @@ const AdminDashboard = () => {
         </div>
       </section>
 
-      {/* Recent Users Section */}
+      {/* Recent Users */}
       <section className="dashboard-section">
         <div className="section-header">
           <h2>Recent Users</h2>
-          <a href="/admin/users" className="link-btn">
-            View all →
-          </a>
+          <a href="/admin/users" className="link-btn">View all →</a>
         </div>
 
         <div className="table-container">
@@ -188,7 +184,7 @@ const AdminDashboard = () => {
         </div>
       </section>
 
-      {/* Quick Actions Section */}
+      {/* Quick Actions */}
       <section className="dashboard-section">
         <h2>Quick Actions</h2>
         <div className="actions-grid">
@@ -197,20 +193,10 @@ const AdminDashboard = () => {
             <h3>Manage Users</h3>
             <p>Create, edit, or disable user accounts</p>
           </a>
-          <a href="/admin/devices" className="action-card">
-            <span className="action-icon">📱</span>
-            <h3>Manage Devices</h3>
-            <p>View and assign IoT devices</p>
-          </a>
           <a href="/admin/alerts" className="action-card">
             <span className="action-icon">🔔</span>
             <h3>View Alerts</h3>
             <p>Monitor system alerts and incidents</p>
-          </a>
-          <a href="/admin/settings" className="action-card">
-            <span className="action-icon">⚙️</span>
-            <h3>System Settings</h3>
-            <p>Configure thresholds and preferences</p>
           </a>
         </div>
       </section>
@@ -219,4 +205,3 @@ const AdminDashboard = () => {
 }
 
 export default AdminDashboard
-
