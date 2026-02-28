@@ -56,14 +56,14 @@ def save_crop(user_id, name):
 	finally:
 		conn.close()
 
-def save_crop_threshold(crop_id, stage, parameter, min_value, max_value, unit):
+def save_crop_threshold(crop_name, temp_min, temp_max, humidity_min, humidity_max, co2_min, co2_max):
 	conn = get_connection()
 	try:
 		cur = conn.cursor()
 		cur.execute("""
-			INSERT INTO crop_thresholds (crop_id, stage, parameter, min_value, max_value, unit)
-			VALUES (%s, %s, %s, %s, %s, %s)
-		""", (crop_id, stage, parameter, min_value, max_value, unit))
+			INSERT INTO crop_thresholds (crop_name, temp_min, temp_max, humidity_min, humidity_max, co2_min, co2_max)
+			VALUES (%s, %s, %s, %s, %s, %s, %s)
+		""", (crop_name, temp_min, temp_max, humidity_min, humidity_max, co2_min, co2_max))
 		conn.commit()
 		threshold_id = cur.lastrowid
 		cur.close()
@@ -82,11 +82,11 @@ def get_user_crops(user_id):
 	finally:
 		conn.close()
 
-def get_crop_thresholds(crop_id):
+def get_crop_thresholds(crop_name):
 	conn = get_connection()
 	try:
 		cur = conn.cursor(dictionary=True)
-		cur.execute("SELECT id, stage, parameter, min_value, max_value, unit FROM crop_thresholds WHERE crop_id = %s", (crop_id,))
+		cur.execute("SELECT id, temp_min, temp_max, humidity_min, humidity_max, co2_min, co2_max FROM crop_thresholds WHERE crop_name = %s", (crop_name,))
 		rv = cur.fetchall()
 		cur.close()
 		return rv
@@ -113,14 +113,22 @@ def api_get_crops(user_id):
 def api_add_threshold():
 	data = request.json
 	try:
-		t_id = save_crop_threshold(data['crop_id'], data['stage'], data['parameter'], data['min_value'], data['max_value'], data['unit'])
+		t_id = save_crop_threshold(
+			data['crop_name'],
+			data['temp_min'],
+			data['temp_max'],
+			data['humidity_min'],
+			data['humidity_max'],
+			data['co2_min'],
+			data['co2_max']
+		)
 		return jsonify({"message": "success", "id": t_id}), 201
 	except Exception as e:
 		return jsonify({"error": str(e)}), 500
 
-@crop_api_bp.route('/api/thresholds/<int:crop_id>', methods=['GET'])
-def api_get_thresholds(crop_id):
+@crop_api_bp.route('/api/thresholds/<string:crop_name>', methods=['GET'])
+def api_get_thresholds(crop_name):
 	try:
-		return jsonify(get_crop_thresholds(crop_id))
+		return jsonify(get_crop_thresholds(crop_name))
 	except Exception as e:
 		return jsonify({"error": str(e)}), 500

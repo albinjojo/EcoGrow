@@ -18,11 +18,12 @@ const UserCropManagement = () => {
 
     const [isThresholdModalOpen, setIsThresholdModalOpen] = useState(false)
     const [thresholdData, setThresholdData] = useState({
-        stage: 'germination',
-        parameter: 'temperature',
-        minValue: '',
-        maxValue: '',
-        unit: '°C'
+        temp_min: '',
+        temp_max: '',
+        humidity_min: '',
+        humidity_max: '',
+        co2_min: '',
+        co2_max: ''
     })
 
     useEffect(() => {
@@ -66,9 +67,9 @@ const UserCropManagement = () => {
         fetchCrops(selectedUser)
     }, [selectedUser])
 
-    const fetchThresholds = async (cropId) => {
+    const fetchThresholds = async (cropName) => {
         try {
-            const res = await fetch(`http://localhost:5000/api/thresholds/${cropId}`)
+            const res = await fetch(`http://localhost:5000/api/thresholds/${cropName}`)
             if (res.ok) {
                 const data = await res.json()
                 setCropThresholds(data)
@@ -80,7 +81,7 @@ const UserCropManagement = () => {
 
     useEffect(() => {
         if (selectedCrop) {
-            fetchThresholds(selectedCrop.id)
+            fetchThresholds(selectedCrop.name)
         } else {
             setCropThresholds([])
         }
@@ -115,23 +116,25 @@ const UserCropManagement = () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    crop_id: selectedCrop.id,
-                    stage: thresholdData.stage,
-                    parameter: thresholdData.parameter,
-                    min_value: parseFloat(thresholdData.minValue),
-                    max_value: parseFloat(thresholdData.maxValue),
-                    unit: thresholdData.unit
+                    crop_name: selectedCrop.name,
+                    temp_min: parseFloat(thresholdData.temp_min),
+                    temp_max: parseFloat(thresholdData.temp_max),
+                    humidity_min: parseFloat(thresholdData.humidity_min),
+                    humidity_max: parseFloat(thresholdData.humidity_max),
+                    co2_min: parseFloat(thresholdData.co2_min),
+                    co2_max: parseFloat(thresholdData.co2_max)
                 })
             })
             if (res.ok) {
                 setIsThresholdModalOpen(false)
-                fetchThresholds(selectedCrop.id)
+                fetchThresholds(selectedCrop.name)
                 setThresholdData({
-                    stage: 'germination',
-                    parameter: 'temperature',
-                    minValue: '',
-                    maxValue: '',
-                    unit: '°C'
+                    temp_min: '',
+                    temp_max: '',
+                    humidity_min: '',
+                    humidity_max: '',
+                    co2_min: '',
+                    co2_max: ''
                 })
             }
         } catch (err) {
@@ -145,11 +148,12 @@ const UserCropManagement = () => {
     ]
 
     const thresholdColumns = [
-        { key: 'stage', label: 'Stage', width: '150px' },
-        { key: 'parameter', label: 'Parameter', width: '150px' },
-        { key: 'min_value', label: 'Min', width: '100px' },
-        { key: 'max_value', label: 'Max', width: '100px' },
-        { key: 'unit', label: 'Unit', width: '80px' },
+        { key: 'temp_min', label: 'Temp Min', width: '90px' },
+        { key: 'temp_max', label: 'Temp Max', width: '90px' },
+        { key: 'humidity_min', label: 'Hum Min', width: '90px' },
+        { key: 'humidity_max', label: 'Hum Max', width: '90px' },
+        { key: 'co2_min', label: 'CO2 Min', width: '90px' },
+        { key: 'co2_max', label: 'CO2 Max', width: '90px' },
     ]
 
     return (
@@ -190,9 +194,9 @@ const UserCropManagement = () => {
                 <div style={{ display: 'flex', gap: '24px' }}>
                     <div style={{ flex: 1 }}>
                         <section className="page-content" style={{ padding: '24px', background: 'var(--c-surface)', border: '1px solid var(--c-border-strong)', borderRadius: 'var(--radius-sm)' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-                                <h3>Crops</h3>
-                                <button className="primary-btn" onClick={() => setIsCropModalOpen(true)}>+ Add Crop</button>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', gap: '16px' }}>
+                                <h3 style={{ margin: 0, whiteSpace: 'nowrap' }}>Crops</h3>
+                                <button className="primary-btn" style={{ whiteSpace: 'nowrap' }} onClick={() => setIsCropModalOpen(true)}>+ Add Crop</button>
                             </div>
                             {userCrops.length > 0 ? (
                                 <DataTable
@@ -206,12 +210,12 @@ const UserCropManagement = () => {
                         </section>
                     </div>
 
-                    <div style={{ flex: 1 }}>
+                    <div style={{ flex: 1.8 }}>
                         {selectedCrop ? (
-                            <section className="page-content" style={{ padding: '24px', background: 'var(--c-surface)', border: '1px solid var(--c-border-strong)', borderRadius: 'var(--radius-sm)' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-                                    <h3>Thresholds for {selectedCrop.name}</h3>
-                                    <button className="primary-btn" onClick={() => setIsThresholdModalOpen(true)}>+ Add Threshold</button>
+                            <section className="page-content" style={{ padding: '24px', background: 'var(--c-surface)', border: '1px solid var(--c-border-strong)', borderRadius: 'var(--radius-sm)', height: '100%' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                                    <h3 style={{ margin: 0, paddingRight: '12px' }}>Thresholds for {selectedCrop.name}</h3>
+                                    <button className="primary-btn" style={{ whiteSpace: 'nowrap' }} onClick={() => setIsThresholdModalOpen(true)}>+ Add Threshold</button>
                                 </div>
                                 {cropThresholds.length > 0 ? (
                                     <DataTable columns={thresholdColumns} rows={cropThresholds} />
@@ -263,49 +267,53 @@ const UserCropManagement = () => {
                 }
             >
                 <div className="form-container">
-                    <div className="form-group">
-                        <label>Stage <span className="required">*</span></label>
-                        <select name="stage" value={thresholdData.stage} onChange={handleThresholdChange} className="form-input" style={{ width: '100%' }}>
-                            <option value="germination">Germination</option>
-                            <option value="vegetative">Vegetative</option>
-                            <option value="flowering">Flowering</option>
-                            <option value="fruiting">Fruiting</option>
-                            <option value="harvesting">Harvesting</option>
-                        </select>
-                    </div>
-
-                    <div className="form-group" style={{ marginTop: '16px' }}>
-                        <label>Parameter <span className="required">*</span></label>
-                        <select name="parameter" value={thresholdData.parameter} onChange={handleThresholdChange} className="form-input" style={{ width: '100%' }}>
-                            <option value="temperature">Temperature</option>
-                            <option value="humidity">Humidity</option>
-                            <option value="co2">CO2</option>
-                        </select>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginTop: '16px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '16px' }}>
                         <FormField
-                            label="Min Value"
-                            name="minValue"
+                            label="Temp Min (°C)"
+                            name="temp_min"
                             type="number"
-                            value={thresholdData.minValue}
+                            value={thresholdData.temp_min}
                             onChange={handleThresholdChange}
                         />
                         <FormField
-                            label="Max Value"
-                            name="maxValue"
+                            label="Temp Max (°C)"
+                            name="temp_max"
                             type="number"
-                            value={thresholdData.maxValue}
+                            value={thresholdData.temp_max}
                             onChange={handleThresholdChange}
                         />
-                        <div className="form-group">
-                            <label>Unit</label>
-                            <select name="unit" value={thresholdData.unit} onChange={handleThresholdChange} className="form-input" style={{ width: '100%' }}>
-                                <option value="°C">°C</option>
-                                <option value="%">%</option>
-                                <option value="ppm">ppm</option>
-                            </select>
-                        </div>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '16px' }}>
+                        <FormField
+                            label="Humidity Min (%)"
+                            name="humidity_min"
+                            type="number"
+                            value={thresholdData.humidity_min}
+                            onChange={handleThresholdChange}
+                        />
+                        <FormField
+                            label="Humidity Max (%)"
+                            name="humidity_max"
+                            type="number"
+                            value={thresholdData.humidity_max}
+                            onChange={handleThresholdChange}
+                        />
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '16px' }}>
+                        <FormField
+                            label="CO2 Min (ppm)"
+                            name="co2_min"
+                            type="number"
+                            value={thresholdData.co2_min}
+                            onChange={handleThresholdChange}
+                        />
+                        <FormField
+                            label="CO2 Max (ppm)"
+                            name="co2_max"
+                            type="number"
+                            value={thresholdData.co2_max}
+                            onChange={handleThresholdChange}
+                        />
                     </div>
                 </div>
             </Modal>

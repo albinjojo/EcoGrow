@@ -14,6 +14,17 @@ socketio_instance = None
 # In-memory cache for throttling DB writes: { user_id: last_timestamp_utc }
 LAST_SAVED = {}
 
+# Global active user ID. We use this to decide which user is associated
+# with incoming hardware sensor data, since the raw MQTT streams don't carry web sessions.
+# This gets updated dynamically when a user logs into the web app.
+ACTIVE_MQTT_USER_ID = 1
+
+def set_active_mqtt_user(user_id):
+    """Update the global active user context. This user receives all incoming hardware data."""
+    global ACTIVE_MQTT_USER_ID
+    ACTIVE_MQTT_USER_ID = int(user_id)
+    print(f"[MQTT] Active user context updated to: {ACTIVE_MQTT_USER_ID}")
+
 # Latest sensor snapshot — updated on every MQTT message
 LATEST_SENSOR_DATA = {}
 
@@ -51,8 +62,8 @@ def on_message(client, userdata, msg):
         temp = float(data.get("temp", 0))
         humidity = float(data.get("humidity", 0))
         
-        # Default to User ID 1 if not provided in payload
-        user_id = data.get("user_id", 1)
+        # Default to the active web session user rather than hardcoded 1
+        user_id = data.get("user_id", ACTIVE_MQTT_USER_ID)
 
         # 0. Update in-memory snapshot (always, for instant access by ai_service)
         LATEST_SENSOR_DATA["co2"]       = co2

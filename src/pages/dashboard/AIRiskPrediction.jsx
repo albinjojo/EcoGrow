@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useAuth } from '../../context/AuthContext'
 import './Dashboard.css'
 
 /* ══════════════════════════════════════════════════════════════
@@ -152,7 +153,6 @@ const AlertToastContainer = ({ toasts, onDismiss }) => {
   )
 }
 
-const CROP_TYPES = ['tomato', 'capsicum', 'cucumber', 'lettuce', 'strawberry']
 const CROP_STAGES = ['vegetative', 'flowering', 'fruiting']
 
 /* ── Crop accent colours ─────────────────────────────────────── */
@@ -361,21 +361,42 @@ const CompactVisualizer = ({ cropType, cropStage, colors }) => {
    Main page component
 ════════════════════════════════════════════════════════════════ */
 const AIRiskPrediction = () => {
+  const { user } = useAuth()
   const [prediction, setPrediction] = useState(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [predicting, setPredicting] = useState(false)   // instant per-crop feedback
+  const [predicting, setPredicting] = useState(false)
   const [error, setError] = useState(null)
-  const [cropType, setCropType] = useState('lettuce')
+  const [cropType, setCropType] = useState('')
   const [cropStage, setCropStage] = useState('vegetative')
+  const [availableCrops, setAvailableCrops] = useState([])
 
   // ── Toast state ─────────────────────────────────────────────
   const [toasts, setToasts] = useState([])
-  // Map of metric → timestamp when alert was last shown. Re-fires after ALERT_REFIRE_MS.
-  const ALERT_REFIRE_MS = 60_000  // 1 minute
-  const lastAlertTimeRef = useRef({})  // { [metric]: timestamp }
+  const ALERT_REFIRE_MS = 60_000
+  const lastAlertTimeRef = useRef({})
 
   useEffect(() => { injectKeyframes() }, [])
+
+  // ── Fetch user's crops from DB ───────────────────────────────────────────
+  useEffect(() => {
+    if (!user?.id) return
+    const fetchCrops = async () => {
+      try {
+        const res = await fetch(`http://localhost:5000/api/user/crops?user_id=${user.id}`)
+        if (res.ok) {
+          const data = await res.json()
+          setAvailableCrops(data)
+          if (data.length > 0) {
+            setCropType(data[0].name.toLowerCase())
+          }
+        }
+      } catch (e) {
+        console.error('Failed to fetch user crops:', e)
+      }
+    }
+    fetchCrops()
+  }, [user?.id])
 
   // Always-current ref — interval never uses stale closure values
   const cropRef = useRef({ type: cropType, stage: cropStage })
@@ -396,11 +417,14 @@ const AIRiskPrediction = () => {
     setError(null)
 
     try {
-      const url = `http://localhost:5000/api/ai/predict?crop_type=${type}&crop_stage=${stage}`
+      const userId = user?.id || 1
+      const url = `http://localhost:5000/api/ai/predict?crop_type=${type}&crop_stage=${stage}&user_id=${userId}`
       const res = await fetch(url, { signal: ctrl.signal })
       if (!res.ok) throw new Error('Failed to fetch prediction')
       const data = await res.json()
       setPrediction(data)
+      // Cache so re-navigation shows content instantly
+      try { sessionStorage.setItem('ai_pred_cache', JSON.stringify({ data, type, stage })) } catch (_) { }
 
       // ── Handle alerts → toasts (re-fires every 1 min if condition persists) ──
       const incoming = data.alerts ?? []
@@ -433,6 +457,23 @@ const AIRiskPrediction = () => {
   }
 
   useEffect(() => {
+    // If we have cached data from a previous visit, render it immediately
+    // and only do a silent background refresh — no full-page loading spinner.
+    try {
+      const raw = sessionStorage.getItem('ai_pred_cache')
+      if (raw) {
+        const { data, type, stage } = JSON.parse(raw)
+        setPrediction(data)
+        setCropType(type)
+        setCropStage(stage)
+        cropRef.current = { type, stage }
+        setLoading(false)
+        fetchPrediction(type, stage, false)   // background refresh only
+        const id = setInterval(() => fetchPrediction(), 30000)
+        return () => { clearInterval(id); abortRef.current?.abort() }
+      }
+    } catch (_) { }
+    // No cache — initial full load
     fetchPrediction(cropRef.current.type, cropRef.current.stage, true)
     const id = setInterval(() => fetchPrediction(), 30000)
     return () => { clearInterval(id); abortRef.current?.abort() }
@@ -525,7 +566,13 @@ const AIRiskPrediction = () => {
                   onChange={(e) => handleCropChange(e.target.value, cropStage)}
                   className="form-input"
                 >
-                  {CROP_TYPES.map(t => <option key={t} value={t}>{cap(t)}</option>)}
+                  {availableCrops.length === 0 ? (
+                    <option value="">No crops added yet</option>
+                  ) : (
+                    availableCrops.map(c => (
+                      <option key={c.id} value={c.name.toLowerCase()}>{cap(c.name)}</option>
+                    ))
+                  )}
                 </select>
               </div>
               <div className="form-group">

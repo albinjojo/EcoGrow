@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useAuth } from '../../context/AuthContext'
 import './Dashboard.css'
 
 const SEVERITY_COLOR = {
@@ -23,6 +24,7 @@ function timeAgo(isoStr) {
 const PAGE_SIZE = 20
 
 const Alerts = () => {
+  const { user } = useAuth()
   const [alerts, setAlerts] = useState([])
   const [total, setTotal] = useState(0)
   const [offset, setOffset] = useState(0)
@@ -37,7 +39,8 @@ const Alerts = () => {
     setError(null)
     try {
       const sevParam = sev !== 'all' ? `&severity=${sev}` : ''
-      const res = await fetch(`http://localhost:5000/api/alerts?limit=${PAGE_SIZE}&offset=${off}${sevParam}`)
+      const userParam = user ? `&user_id=${user.id}` : ''
+      const res = await fetch(`http://localhost:5000/api/alerts?limit=${PAGE_SIZE}&offset=${off}${sevParam}${userParam}`)
       if (!res.ok) throw new Error('Failed to fetch alerts')
       const data = await res.json()
       setAlerts(data.alerts ?? [])
@@ -50,13 +53,14 @@ const Alerts = () => {
     }
   }
 
-  // Initial load + 30s auto-refresh
+  // Initial load + 30s auto-refresh — re-run when user changes
   useEffect(() => {
+    if (!user) return   // wait until auth is resolved
     fetchAlerts(0, filter, true)
     const id = setInterval(() => fetchAlerts(offset, filter), 30_000)
     return () => clearInterval(id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [user?.id])
 
   const handlePage = (newOffset) => {
     setOffset(newOffset)

@@ -30,10 +30,10 @@ from ai_service import ai_bp
 from validators import validate_email, validate_password
 
 from flask_socketio import SocketIO
-from mqtt_service import start_mqtt_client, set_socketio
+from mqtt_service import start_mqtt_client, set_socketio, set_active_mqtt_user
 from apscheduler.schedulers.background import BackgroundScheduler
 from ai_service import _check_alerts, _gemini_suggestion, _save_alerts_to_db
-from mqtt_service import get_latest_sensor_data
+from mqtt_service import get_latest_sensor_data, ACTIVE_MQTT_USER_ID
 
 load_dotenv()
 
@@ -95,7 +95,7 @@ def background_alert_check():
             continue
         for alert in alerts:
             alert["suggestion"] = _gemini_suggestion(alert, crop_type, crop_stage)
-        _save_alerts_to_db(alerts, crop_type, crop_stage)
+        _save_alerts_to_db(alerts, crop_type, crop_stage, ACTIVE_MQTT_USER_ID)
     print(f"[Scheduler] Alert check done — sensor: temp={sensor.get('temp')}, "
           f"hum={sensor.get('humidity')}, co2={sensor.get('co2')}")
 
@@ -306,12 +306,24 @@ def login_user():
     session["user_id"] = user_id
     session["email"] = email
     session["role"] = role
+    set_active_mqtt_user(user_id)
 
-    return jsonify({"message": "Login successful.", "role": role}), 200
+    return jsonify({"message": "Login successful.", "role": role, "id": user_id}), 200
   except Exception:
     return jsonify({"message": "Unable to process login right now."}), 500
   finally:
     conn.close()
+
+@app.post("/api/sensors/active_user")
+def update_active_mqtt_user():
+  """Sync the frontend's active user session to the MQTT backend process."""
+  data = request.get_json(silent=True) or {}
+  user_id = data.get("user_id")
+  if not user_id:
+    return jsonify({"message": "user_id is required."}), 400
+  
+  set_active_mqtt_user(user_id)
+  return jsonify({"message": "Active MQTT user updated successfully."}), 200
 
 
 @app.post("/api/forgot-password")
@@ -671,10 +683,10 @@ def google_callback():
     if status != "active":
       return jsonify({"message": "Account is disabled."}), 403
     
-    # establish session
     session["user_id"] = user_id
     session["email"] = email
     session["role"] = role
+    set_active_mqtt_user(user_id)
   finally:
     conn.close()
 

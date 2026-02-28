@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { io } from 'socket.io-client'
 import {
   LineChart,
@@ -9,23 +9,101 @@ import {
   Tooltip,
   ResponsiveContainer
 } from 'recharts'
+import { useAuth } from '../../context/AuthContext'
 import './Dashboard.css'
 
+/* ── Toast system (same as AIRiskPrediction) ───────────────────────── */
+const TOAST_DURATION = 8000
+const SEVERITY_STYLES = {
+  warning: { border: '#f59e0b', bg: '#fffbeb', icon: '⚠️', badge: { bg: '#fef3c7', color: '#92400e', border: '#fcd34d' } },
+  critical: { border: '#ef4444', bg: '#fff1f2', icon: '🚨', badge: { bg: '#fee2e2', color: '#991b1b', border: '#fca5a5' } },
+}
+const METRIC_ICONS = { temp: '🌡️', humidity: '💧', co2: '🌿' }
+
+const AlertToast = ({ toast, onDismiss }) => {
+  const [progress, setProgress] = useState(100)
+  const [exiting, setExiting] = useState(false)
+  const intervalRef = useRef(null)
+  useEffect(() => {
+    const start = Date.now()
+    intervalRef.current = setInterval(() => {
+      const pct = Math.max(0, 100 - ((Date.now() - start) / TOAST_DURATION) * 100)
+      setProgress(pct)
+      if (pct <= 0) { clearInterval(intervalRef.current); handleDismiss() }
+    }, 80)
+    return () => clearInterval(intervalRef.current)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  const handleDismiss = () => { setExiting(true); setTimeout(() => onDismiss(toast.id), 320) }
+  const sty = SEVERITY_STYLES[toast.severity] || SEVERITY_STYLES.warning
+  const metricIcon = METRIC_ICONS[toast.metric] || '📊'
+  return (
+    <div style={{
+      background: sty.bg, border: `1px solid ${sty.border}`, borderLeft: `4px solid ${sty.border}`,
+      borderRadius: '0', padding: '12px 36px 0 14px', width: '320px',
+      boxShadow: '0 8px 24px rgba(0,0,0,0.14)', position: 'relative', overflow: 'hidden',
+      transform: exiting ? 'translateX(360px)' : 'translateX(0)',
+      opacity: exiting ? 0 : 1,
+      transition: 'transform 0.32s cubic-bezier(0.4,0,1,1), opacity 0.28s ease',
+      animation: 'toast-slide-in 0.3s cubic-bezier(0.16,1,0.3,1)',
+    }}>
+      <button onClick={handleDismiss} style={{
+        position: 'absolute', top: '8px', right: '10px', background: 'none', border: 'none',
+        cursor: 'pointer', fontSize: '14px', color: '#6b7280', lineHeight: 1, padding: '2px 4px',
+      }} aria-label="Dismiss">✕</button>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '6px' }}>
+        <span style={{ fontSize: '16px', lineHeight: 1, marginTop: '1px', flexShrink: 0 }}>{sty.icon}</span>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+            <span style={{
+              fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px',
+              padding: '2px 7px', background: sty.badge.bg, color: sty.badge.color, border: `1px solid ${sty.badge.border}`,
+            }}>{toast.severity}</span>
+            <span style={{ fontSize: '11px', color: '#6b7280' }}>{metricIcon} {toast.label?.toUpperCase() || toast.metric?.toUpperCase()}</span>
+          </div>
+          <p style={{ fontSize: '13px', fontWeight: 600, color: '#111827', marginTop: '4px', lineHeight: 1.4 }}>{toast.message}</p>
+        </div>
+      </div>
+      {toast.suggestion && (
+        <p style={{ fontSize: '11.5px', color: '#4b5563', fontStyle: 'italic', lineHeight: 1.5, marginBottom: '10px', borderTop: '1px solid rgba(0,0,0,0.07)', paddingTop: '6px' }}>
+          💡 {toast.suggestion}
+        </p>
+      )}
+      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '3px', background: 'rgba(0,0,0,0.07)' }}>
+        <div style={{ height: '100%', width: `${progress}%`, background: sty.border, transition: 'width 0.08s linear' }} />
+      </div>
+    </div>
+  )
+}
+
+const AlertToastContainer = ({ toasts, onDismiss }) => {
+  if (!toasts.length) return null
+  return (
+    <div style={{ position: 'fixed', top: '16px', right: '16px', zIndex: 9999, display: 'flex', flexDirection: 'column', gap: '10px', pointerEvents: 'none' }}>
+      {toasts.slice(0, 5).map(t => (
+        <div key={t.id} style={{ pointerEvents: 'auto' }}><AlertToast toast={t} onDismiss={onDismiss} /></div>
+      ))}
+    </div>
+  )
+}
+
 const DashboardHome = () => {
+  const { user } = useAuth()
   const [client, setClient] = useState(null)
   const [connectionStatus, setConnectionStatus] = useState('Disconnected')
   const [systemStatus, setSystemStatus] = useState('Waiting for status...')
-  const [sensorData, setSensorData] = useState({
-    co2: 0,
-    temp: 0,
-    humidity: 0
-  })
+  const [sensorData, setSensorData] = useState({ co2: 0, temp: 0, humidity: 0 })
   const [sensorHistory, setSensorHistory] = useState([])
 
-  // ── Live AI risk state ──────────────────────────────────────────
+  // ── Live AI risk + toast state ───────────────────────────────────
   const [aiRisk, setAiRisk] = useState(null)
   const [aiLoading, setAiLoading] = useState(true)
   const [recentAlerts, setRecentAlerts] = useState([])
+  const [toasts, setToasts] = useState([])
+  const ALERT_REFIRE_MS = 60_000
+  const lastAlertTimeRef = useRef({})
+
+  const dismissToast = useCallback((id) => setToasts(prev => prev.filter(t => t.id !== id)), [])
 
   // Calculate trends (simple comparison with previous data point)
   const getTrend = (current, key) => {
@@ -104,12 +182,29 @@ const DashboardHome = () => {
     }
   }, [])
 
-  // ── Fetch AI risk prediction (auto-refresh every 30s) ────────────────
+  // ── Fetch AI risk prediction + fire toasts (auto-refresh every 30s) ──
   useEffect(() => {
     const fetchRisk = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/ai/predict?crop_type=lettuce&crop_stage=vegetative')
-        if (res.ok) setAiRisk(await res.json())
+        const userId = user?.id || 1
+        const res = await fetch(`http://localhost:5000/api/ai/predict?crop_type=lettuce&crop_stage=vegetative&user_id=${userId}`)
+        if (res.ok) {
+          const data = await res.json()
+          setAiRisk(data)
+          // Fire toasts for any alerts, re-fires after 1 min cooldown
+          const incoming = data.alerts ?? []
+          const now = Date.now()
+          Object.keys(lastAlertTimeRef.current).forEach(m => {
+            if (!incoming.find(a => a.metric === m)) delete lastAlertTimeRef.current[m]
+          })
+          const newToasts = incoming
+            .filter(a => { const last = lastAlertTimeRef.current[a.metric]; return !last || (now - last) >= ALERT_REFIRE_MS })
+            .map(a => ({ ...a, id: `${a.metric}-${now}` }))
+          if (newToasts.length > 0) {
+            newToasts.forEach(t => { lastAlertTimeRef.current[t.metric] = now })
+            setToasts(prev => [...newToasts, ...prev])
+          }
+        }
       } catch (e) {
         console.error('AI risk fetch failed:', e)
       } finally {
@@ -119,13 +214,15 @@ const DashboardHome = () => {
     fetchRisk()
     const id = setInterval(fetchRisk, 30_000)
     return () => clearInterval(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // ── Fetch last 4 alert logs for System Logs panel ───────────────────
   useEffect(() => {
     const fetchRecentAlerts = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/alerts?limit=4&offset=0')
+        const userId = user?.id || 1
+        const res = await fetch(`http://localhost:5000/api/alerts?limit=4&offset=0&user_id=${userId}`)
         if (res.ok) {
           const data = await res.json()
           setRecentAlerts(data.alerts ?? [])
@@ -163,6 +260,7 @@ const DashboardHome = () => {
 
   return (
     <div className="dash-grid">
+      <AlertToastContainer toasts={toasts} onDismiss={dismissToast} />
       {/* Header Area */}
       <div className="grid-header">
         <div>

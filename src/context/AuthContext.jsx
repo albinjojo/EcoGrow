@@ -10,12 +10,27 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
 
+  // Sync active user to backend MQTT service
+  const syncActiveUser = async (userId) => {
+    try {
+      await fetch('http://localhost:5000/api/sensors/active_user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId })
+      })
+    } catch (e) {
+      console.error('Failed to sync active user to backend:', e)
+    }
+  }
+
   // Initialize from localStorage on component mount
   useEffect(() => {
     const storedUser = localStorage.getItem('ecogrow_user')
     if (storedUser) {
       try {
-        setUser(JSON.parse(storedUser))
+        const parsed = JSON.parse(storedUser)
+        setUser(parsed)
+        syncActiveUser(parsed.id)
       } catch (error) {
         console.error('Failed to parse stored user:', error)
         localStorage.removeItem('ecogrow_user')
@@ -35,6 +50,7 @@ export const AuthProvider = ({ children }) => {
     }
     setUser(user)
     localStorage.setItem('ecogrow_user', JSON.stringify(user))
+    syncActiveUser(user.id)
   }
 
   /**

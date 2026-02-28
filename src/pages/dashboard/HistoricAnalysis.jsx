@@ -3,21 +3,25 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
 } from 'recharts'
+import { useAuth } from '../../context/AuthContext'
 import './Dashboard.css'
 
 const COLORS = ['#10b981', '#f59e0b', '#ef4444', '#6366f1']
 
 const HistoricAnalysis = () => {
+  const { user } = useAuth()
   const [summary, setSummary] = useState(null)
   const [trends, setTrends] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    if (!user) return
     const fetchData = async () => {
       try {
+        const userId = user.id
         const [sumRes, trendRes] = await Promise.all([
-          fetch('http://localhost:5000/api/analytics/summary'),
-          fetch('http://localhost:5000/api/analytics/trends')
+          fetch(`http://localhost:5000/api/analytics/summary?user_id=${userId}`),
+          fetch(`http://localhost:5000/api/analytics/trends?user_id=${userId}`)
         ])
         if (sumRes.ok && trendRes.ok) {
           setSummary(await sumRes.json())
@@ -32,7 +36,7 @@ const HistoricAnalysis = () => {
     fetchData()
     const id = setInterval(fetchData, 60000)
     return () => clearInterval(id)
-  }, [])
+  }, [user?.id])
 
   if (loading) return <div className="dash-page"><p>Loading analytics...</p></div>
 

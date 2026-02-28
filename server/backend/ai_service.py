@@ -35,12 +35,13 @@ _FALLBACK_SUGGESTIONS = {
 }
 
 
-def _check_alerts(sensor: dict, crop_type: str, crop_stage: str) -> list:
+def _check_alerts(sensor: dict, crop_type: str, crop_stage: str, ranges: dict = None) -> list:
     """
-    Compare sensor readings against CROP_IDEAL_RANGES[crop_type].
-    Returns list of alert dicts with metric, value, ideal range, severity, and message.
+    Compare sensor readings against threshold ranges.
+    `ranges` may be pre-fetched from DB; falls back to CROP_IDEAL_RANGES if absent.
     """
-    ranges = CROP_IDEAL_RANGES.get(crop_type, CROP_IDEAL_RANGES["lettuce"])
+    if ranges is None:
+        ranges = CROP_IDEAL_RANGES.get(crop_type, CROP_IDEAL_RANGES["lettuce"])
     alerts = []
 
     checks = [
@@ -199,6 +200,7 @@ def predict_risk():
     # Crop context from frontend query params
     crop_type  = request.args.get("crop_type",  "lettuce").lower().strip()
     crop_stage = request.args.get("crop_stage", "vegetative").lower().strip()
+    user_id    = request.args.get("user_id", 1)
 
     sensor = get_latest_sensor_data()
 
@@ -237,10 +239,12 @@ def predict_risk():
         source = "rule-based-fallback"
 
     # ── Alert engine ─────────────────────────────────────────────────────────
-    alerts = _check_alerts(sensor, crop_type, crop_stage)
+    # Try to fetch thresholds from DB for this user & crop
+    db_ranges = _fetch_crop_thresholds_from_db(user_id, crop_type)
+    alerts = _check_alerts(sensor, crop_type, crop_stage, ranges=db_ranges)
     for alert in alerts:
         alert["suggestion"] = _gemini_suggestion(alert, crop_type, crop_stage)
-    _save_alerts_to_db(alerts, crop_type, crop_stage)
+    _save_alerts_to_db(alerts, crop_type, crop_stage, user_id)
 
     return jsonify({
         "risk_level":       risk_level,
@@ -261,7 +265,7 @@ def predict_risk():
     }), 200
 
 
-def _save_alerts_to_db(alerts: list, crop_type: str, crop_stage: str):
+def _save_alerts_to_db(alerts: list, crop_type: str, crop_stage: str, user_id):
     """Persist each alert to the crop_alerts table."""
     if not alerts:
         return
@@ -271,12 +275,12 @@ def _save_alerts_to_db(alerts: list, crop_type: str, crop_stage: str):
         cur.executemany(
             """
             INSERT INTO crop_alerts
-              (metric, value, ideal_min, ideal_max, severity, message, suggestion, crop_type, crop_stage)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+              (user_id, metric, value, ideal_min, ideal_max, severity, message, suggestion, crop_type, crop_stage)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             [
                 (
-                    a["metric"], a["value"], a["ideal_min"], a["ideal_max"],
+                    user_id, a["metric"], a["value"], a["ideal_min"], a["ideal_max"],
                     a["severity"], a["message"], a.get("suggestion", ""),
                     crop_type, crop_stage,
                 )
@@ -290,6 +294,70 @@ def _save_alerts_to_db(alerts: list, crop_type: str, crop_stage: str):
         print(f"[AI] Failed to save alerts to DB: {exc}")
 
 
+def _fetch_crop_thresholds_from_db(user_id, crop_name: str) -> dict | None:
+    """
+    Look up crop_thresholds for the given user and crop name.
+    Returns a dict { 'temp': (min, max), 'humidity': (min, max), 'co2': (min, max) }
+    or None if not found (caller falls back to CROP_IDEAL_RANGES).
+    """
+    conn = None
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT ct.temp_min, ct.temp_max,
+                   ct.humidity_min, ct.humidity_max,
+                   ct.co2_min, ct.co2_max
+            FROM crop_thresholds ct
+            JOIN crops c ON c.id = ct.crop_id
+            WHERE c.user_id = %s AND LOWER(c.name) = LOWER(%s) AND c.status = 'active'
+            LIMIT 1
+            """,
+            (user_id, crop_name)
+        )
+        row = cur.fetchone()
+        cur.close()
+        if row:
+            return {
+                "temp":     (float(row[0]), float(row[1])),
+                "humidity": (float(row[2]), float(row[3])),
+                "co2":      (float(row[4]), float(row[5])),
+            }
+    except Exception as exc:
+        print(f"[AI] DB threshold lookup failed: {exc}")
+    finally:
+        if conn:
+            conn.close()
+    return None
+
+
+@ai_bp.route('/api/user/crops', methods=['GET'])
+def get_user_crops():
+    """Return active crops for the given user_id."""
+    from flask import session as flask_session
+    user_id = request.args.get('user_id') or flask_session.get('user_id')
+    if not user_id:
+        return jsonify([]), 200
+    conn = None
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT id, name FROM crops WHERE user_id = %s AND status = 'active' ORDER BY name",
+            (user_id,)
+        )
+        rows = cur.fetchall()
+        cur.close()
+        return jsonify([{"id": r[0], "name": r[1]} for r in rows]), 200
+    except Exception as exc:
+        print(f"[AI] get_user_crops failed: {exc}")
+        return jsonify([]), 200
+    finally:
+        if conn:
+            conn.close()
+
+
 @ai_bp.route('/api/alerts', methods=['GET'])
 def get_alerts():
     """
@@ -298,45 +366,43 @@ def get_alerts():
         limit    – rows per page (default 50)
         offset   – starting row   (default 0)
         severity – optional filter: 'warning' or 'critical'
+        user_id  - optional filter by user
     """
     limit    = min(int(request.args.get("limit", 50)), 200)
     offset   = int(request.args.get("offset", 0))
     severity = request.args.get("severity", "").strip().lower()
+    user_id  = request.args.get("user_id")
+    
     conn = None
     try:
         conn = get_connection()
         cur  = conn.cursor()
 
+        query = """
+            SELECT id, metric, value, ideal_min, ideal_max, severity,
+                   message, suggestion, crop_type, crop_stage, created_at
+            FROM crop_alerts
+            WHERE 1=1
+        """
+        count_query = "SELECT COUNT(*) FROM crop_alerts WHERE 1=1"
+        params = []
+
         if severity in ("warning", "critical"):
-            cur.execute(
-                """
-                SELECT id, metric, value, ideal_min, ideal_max, severity,
-                       message, suggestion, crop_type, crop_stage, created_at
-                FROM crop_alerts
-                WHERE LOWER(severity) = %s
-                ORDER BY created_at DESC
-                LIMIT %s OFFSET %s
-                """,
-                (severity, limit, offset),
-            )
-        else:
-            cur.execute(
-                """
-                SELECT id, metric, value, ideal_min, ideal_max, severity,
-                       message, suggestion, crop_type, crop_stage, created_at
-                FROM crop_alerts
-                ORDER BY created_at DESC
-                LIMIT %s OFFSET %s
-                """,
-                (limit, offset),
-            )
+            query += " AND LOWER(severity) = %s"
+            count_query += " AND LOWER(severity) = %s"
+            params.append(severity)
+            
+        if user_id:
+            query += " AND user_id = %s"
+            count_query += " AND user_id = %s"
+            params.append(user_id)
+            
+        query += " ORDER BY created_at DESC LIMIT %s OFFSET %s"
+        
+        cur.execute(query, tuple(params + [limit, offset]))
         rows = cur.fetchall()
 
-        # total count respects severity filter
-        if severity in ("warning", "critical"):
-            cur.execute("SELECT COUNT(*) FROM crop_alerts WHERE LOWER(severity) = %s", (severity,))
-        else:
-            cur.execute("SELECT COUNT(*) FROM crop_alerts")
+        cur.execute(count_query, tuple(params))
         total = cur.fetchone()[0]
         cur.close()
 
@@ -368,33 +434,40 @@ def get_alerts():
 @ai_bp.route('/api/analytics/summary', methods=['GET'])
 def get_analytics_summary():
     """Returns 24h overview: total alerts, health score, distribution."""
+    from flask import session as flask_session
+    user_id = request.args.get('user_id') or flask_session.get('user_id') or 1
+
     conn = None
     try:
         conn = get_connection()
         cur = conn.cursor()
         
-        # 1. Total alerts last 24h
-        cur.execute("SELECT COUNT(*) FROM crop_alerts WHERE created_at >= NOW() - INTERVAL 1 DAY")
+        # 1. Total alerts last 24h for this user
+        cur.execute(
+            "SELECT COUNT(*) FROM crop_alerts WHERE user_id = %s AND created_at >= NOW() - INTERVAL 1 DAY",
+            (user_id,)
+        )
         total_24h = cur.fetchone()[0]
         
-        # 2. Distribution by metric
+        # 2. Distribution by metric for this user
         cur.execute("""
             SELECT metric, COUNT(*) as count 
             FROM crop_alerts 
-            WHERE created_at >= NOW() - INTERVAL 1 DAY 
+            WHERE user_id = %s AND created_at >= NOW() - INTERVAL 1 DAY 
             GROUP BY metric
-        """)
+        """, (user_id,))
         distribution = [{"metric": m, "count": c} for m, c in cur.fetchall()]
         
-        # 3. Health Score (% of time NOT in alert state)
-        # We estimate this by (1 - total_alerts / total_data_points)
-        cur.execute("SELECT COUNT(*) FROM sensor_readings WHERE timestamp_utc >= NOW() - INTERVAL 1 DAY")
-        total_points = cur.fetchone()[0] or 1  # avoid div by zero
+        # 3. Health Score — based on this user's readings
+        cur.execute(
+            "SELECT COUNT(*) FROM sensor_readings WHERE user_id = %s AND timestamp_utc >= NOW() - INTERVAL 1 DAY",
+            (user_id,)
+        )
+        total_points = cur.fetchone()[0] or 1
         health_score = max(0, min(100, (1 - (total_24h / total_points)) * 100))
         
         cur.close()
         
-        # Primary risk is the metric with max count
         primary_risk = "None"
         if distribution:
             primary_risk = max(distribution, key=lambda x: x["count"])["metric"]
@@ -416,12 +489,14 @@ def get_analytics_summary():
 @ai_bp.route('/api/analytics/trends', methods=['GET'])
 def get_analytics_trends():
     """Returns hourly averages for the last 24h for CO2, Temp, Humidity."""
+    from flask import session as flask_session
+    user_id = request.args.get('user_id') or flask_session.get('user_id') or 1
+
     conn = None
     try:
         conn = get_connection()
         cur = conn.cursor()
         
-        # We want hourly averages for the last 24 hours
         cur.execute("""
             SELECT 
                 HOUR(timestamp_utc) as hr,
@@ -429,10 +504,10 @@ def get_analytics_trends():
                 AVG(CASE WHEN sensor_type = 'humidity' THEN value END) as humidity,
                 AVG(CASE WHEN sensor_type = 'co2' THEN value END) as co2
             FROM sensor_readings
-            WHERE timestamp_utc >= NOW() - INTERVAL 1 DAY
+            WHERE user_id = %s AND timestamp_utc >= NOW() - INTERVAL 1 DAY
             GROUP BY hr
-            ORDER BY timestamp_utc ASC
-        """)
+            ORDER BY hr ASC
+        """, (user_id,))
         rows = cur.fetchall()
         
         trends = []
