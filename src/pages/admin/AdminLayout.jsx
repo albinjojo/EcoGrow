@@ -33,6 +33,7 @@ const AdminLayout = () => {
       title: 'Management',
       links: [
         { label: 'Users', to: '/admin/users', icon: '👥' },
+        { label: 'User Crops', to: '/admin/user-crops', icon: '🌱' },
         { label: 'Devices', to: '/admin/devices', icon: '📱' },
         { label: 'Alerts', to: '/admin/alerts', icon: '🔔' },
       ],

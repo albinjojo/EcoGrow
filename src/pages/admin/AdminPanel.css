@@ -100,7 +100,7 @@
   gap: 12px;
   padding: 10px 12px;
   border-radius: var(--radius-sm);
-  color: var(--c-text-secondary);
+  color: var(--c-text-secondary) !important;
   text-decoration: none;
   border: 1px solid transparent;
   transition: all 0.1s;
@@ -111,14 +111,14 @@
 
 .nav-link:hover {
   background: var(--c-bg-app);
-  color: var(--c-text-primary);
+  color: var(--c-text-primary) !important;
   border-color: var(--c-border-subtle);
 }
 
 .nav-link.active,
 .nav-link-active {
   background: var(--c-bg-app);
-  color: var(--c-text-primary);
+  color: var(--c-text-primary) !important;
   border-color: var(--c-border-strong);
   font-weight: 600;
 }

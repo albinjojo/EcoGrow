@@ -24,7 +24,7 @@ from dotenv import load_dotenv
 from google_auth_oauthlib.flow import Flow
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
-from db_connect import get_connection
+from db_connect import get_connection, crop_api_bp
 from user_account import account_bp
 from ai_service import ai_bp
 from validators import validate_email, validate_password
@@ -53,6 +53,7 @@ def get_cors_origins():
 app = Flask(__name__)
 app.register_blueprint(account_bp)
 app.register_blueprint(ai_bp)
+app.register_blueprint(crop_api_bp)
 # CORS(app, origins=get_cors_origins(), supports_credentials=True) # SocketIO handles its own CORS usually, but we keep this for HTTP
 CORS(app, supports_credentials=True) # Simplified for now, or keep explicit
 

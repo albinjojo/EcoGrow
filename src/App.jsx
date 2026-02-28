@@ -17,6 +17,7 @@ import UserAccount from './pages/UserAccount'
 import AdminLayout from './pages/admin/AdminLayout'
 import AdminDashboard from './pages/admin/AdminDashboard'
 import UserManagement from './pages/admin/UserManagement'
+import UserCropManagement from './pages/admin/UserCropManagement'
 import DeviceManagement from './pages/admin/DeviceManagement'
 import AlertsManagement from './pages/admin/AlertsManagement'
 import SystemSettings from './pages/admin/SystemSettings'
@@ -95,6 +96,7 @@ function App() {
         >
           <Route index element={<AdminDashboard />} />
           <Route path="users" element={<UserManagement />} />
+          <Route path="user-crops" element={<UserCropManagement />} />
           <Route path="devices" element={<DeviceManagement />} />
           <Route path="alerts" element={<AlertsManagement />} />
           <Route path="settings" element={<SystemSettings />} />
