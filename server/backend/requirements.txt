@@ -9,3 +9,4 @@ paho-mqtt
 flask-socketio
 simple-websocket
 google-generativeai
+apscheduler

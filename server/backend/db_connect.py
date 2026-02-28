@@ -17,7 +17,7 @@ def get_pool():
 	"""Create or return a shared MySQL connection pool."""
 	return pooling.MySQLConnectionPool(
 		pool_name="ecogrow_flask_pool",
-		pool_size=int(os.environ.get("DB_POOL_SIZE", 5)),
+		pool_size=int(os.environ.get("DB_POOL_SIZE", 15)),
 		host=os.environ.get("DB_HOST", "127.0.0.1"),
 		port=int(os.environ.get("DB_PORT", 3306)),
 		user=os.environ.get("DB_USER"),

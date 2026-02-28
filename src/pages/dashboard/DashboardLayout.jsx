@@ -21,7 +21,6 @@ const navSections = [
       { label: 'Alerts', to: '/dashboard/alerts' },
       { label: 'Reports', to: '/dashboard/reports' },
       { label: 'Historic Analysis', to: '/dashboard/history' },
-      { label: 'Configuration', to: null },
     ],
   },
 ]

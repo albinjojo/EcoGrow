@@ -31,12 +31,13 @@ const Alerts = () => {
   const [error, setError] = useState(null)
   const [filter, setFilter] = useState('all')   // all | critical | warning
 
-  const fetchAlerts = async (off = offset, isInitial = false) => {
+  const fetchAlerts = async (off = offset, sev = filter, isInitial = false) => {
     if (isInitial) setLoading(true)
     else setRefreshing(true)
     setError(null)
     try {
-      const res = await fetch(`http://localhost:5000/api/alerts?limit=${PAGE_SIZE}&offset=${off}`)
+      const sevParam = sev !== 'all' ? `&severity=${sev}` : ''
+      const res = await fetch(`http://localhost:5000/api/alerts?limit=${PAGE_SIZE}&offset=${off}${sevParam}`)
       if (!res.ok) throw new Error('Failed to fetch alerts')
       const data = await res.json()
       setAlerts(data.alerts ?? [])
@@ -51,18 +52,24 @@ const Alerts = () => {
 
   // Initial load + 30s auto-refresh
   useEffect(() => {
-    fetchAlerts(0, true)
-    const id = setInterval(() => fetchAlerts(offset), 30_000)
+    fetchAlerts(0, filter, true)
+    const id = setInterval(() => fetchAlerts(offset, filter), 30_000)
     return () => clearInterval(id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handlePage = (newOffset) => {
     setOffset(newOffset)
-    fetchAlerts(newOffset)
+    fetchAlerts(newOffset, filter)
   }
 
-  const visible = filter === 'all' ? alerts : alerts.filter(a => a.severity === filter)
+  const handleFilter = (f) => {
+    setFilter(f)
+    setOffset(0)
+    fetchAlerts(0, f)
+  }
+
+  const visible = alerts   // already filtered by backend
   const totalPages = Math.ceil(total / PAGE_SIZE)
   const currentPage = Math.floor(offset / PAGE_SIZE) + 1
 
@@ -99,7 +106,7 @@ const Alerts = () => {
         {['all', 'critical', 'warning'].map(f => (
           <button
             key={f}
-            onClick={() => setFilter(f)}
+            onClick={() => handleFilter(f)}
             style={{
               padding: '5px 14px', fontSize: '11px', fontWeight: 700,
               textTransform: 'uppercase', letterSpacing: '0.6px',

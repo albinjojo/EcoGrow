@@ -336,8 +336,8 @@ const DashboardHome = () => {
                 AI Risk Analysis: {aiRisk.risk_level?.toUpperCase()}
               </div>
 
-              {/* Analysis text — dark and bold */}
-              <p className="ai-desc" style={{ marginTop: '6px', color: 'var(--c-text-primary)' }}>
+              {/* Analysis text */}
+              <p style={{ marginTop: '8px', fontSize: '12px', lineHeight: 1.5, color: '#1a1a1a', fontWeight: 500 }}>
                 {aiRisk.analysis}
               </p>
 
@@ -390,7 +390,9 @@ const DashboardHome = () => {
             </li>
             {recentAlerts.map(a => {
               const timeAgo = (() => {
-                const diff = Math.floor((Date.now() - new Date(a.created_at + 'Z')) / 1000)
+                const ts = a.created_at ? new Date(a.created_at.replace(' ', 'T')) : null
+                if (!ts || isNaN(ts)) return ''
+                const diff = Math.floor((Date.now() - ts.getTime()) / 1000)
                 if (diff < 60) return `${diff}s ago`
                 if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
                 return `${Math.floor(diff / 3600)}h ago`

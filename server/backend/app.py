@@ -31,6 +31,9 @@ from validators import validate_email, validate_password
 
 from flask_socketio import SocketIO
 from mqtt_service import start_mqtt_client, set_socketio
+from apscheduler.schedulers.background import BackgroundScheduler
+from ai_service import _check_alerts, _gemini_suggestion, _save_alerts_to_db
+from mqtt_service import get_latest_sensor_data
 
 load_dotenv()
 
@@ -69,6 +72,36 @@ if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
 else:
     # Logic for production servers (gunicorn etc) or first run
     start_mqtt_client()
+
+
+# ── Background scheduler: check alerts every 60s autonomously ─────────────
+DEFAULT_CROP_CHECKS = [
+    ("lettuce",    "vegetative"),
+    ("tomato",     "vegetative"),
+    ("capsicum",   "vegetative"),
+    ("cucumber",   "vegetative"),
+    ("strawberry", "vegetative"),
+]
+
+def background_alert_check():
+    """Runs every 60s in background — checks sensor readings and saves alerts."""
+    sensor = get_latest_sensor_data()
+    if not sensor or not sensor.get("temp"):   # no data yet
+        return
+    for crop_type, crop_stage in DEFAULT_CROP_CHECKS:
+        alerts = _check_alerts(sensor, crop_type, crop_stage)
+        if not alerts:
+            continue
+        for alert in alerts:
+            alert["suggestion"] = _gemini_suggestion(alert, crop_type, crop_stage)
+        _save_alerts_to_db(alerts, crop_type, crop_stage)
+    print(f"[Scheduler] Alert check done — sensor: temp={sensor.get('temp')}, "
+          f"hum={sensor.get('humidity')}, co2={sensor.get('co2')}")
+
+_scheduler = BackgroundScheduler(daemon=True)
+_scheduler.add_job(background_alert_check, 'interval', seconds=60, id='alert_check')
+_scheduler.start()
+print("[Scheduler] Background alert checker started (every 60s)")
 
 
 RESET_LINK_DEBUG = bool(int(os.environ.get("RESET_LINK_DEBUG", "0")))

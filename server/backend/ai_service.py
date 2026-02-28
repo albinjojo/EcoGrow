@@ -2,7 +2,7 @@ import os
 import requests
 from flask import Blueprint, jsonify, request
 from mqtt_service import get_latest_sensor_data
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from db_connect import get_connection
 
 try:
@@ -295,30 +295,50 @@ def get_alerts():
     """
     Return paginated alert history from crop_alerts.
     Query params:
-        limit  – rows per page (default 50)
-        offset – starting row   (default 0)
+        limit    – rows per page (default 50)
+        offset   – starting row   (default 0)
+        severity – optional filter: 'warning' or 'critical'
     """
-    limit  = min(int(request.args.get("limit", 50)), 200)
-    offset = int(request.args.get("offset", 0))
+    limit    = min(int(request.args.get("limit", 50)), 200)
+    offset   = int(request.args.get("offset", 0))
+    severity = request.args.get("severity", "").strip().lower()
+    conn = None
     try:
         conn = get_connection()
         cur  = conn.cursor()
-        cur.execute(
-            """
-            SELECT id, metric, value, ideal_min, ideal_max, severity,
-                   message, suggestion, crop_type, crop_stage, created_at
-            FROM crop_alerts
-            ORDER BY created_at DESC
-            LIMIT %s OFFSET %s
-            """,
-            (limit, offset),
-        )
+
+        if severity in ("warning", "critical"):
+            cur.execute(
+                """
+                SELECT id, metric, value, ideal_min, ideal_max, severity,
+                       message, suggestion, crop_type, crop_stage, created_at
+                FROM crop_alerts
+                WHERE LOWER(severity) = %s
+                ORDER BY created_at DESC
+                LIMIT %s OFFSET %s
+                """,
+                (severity, limit, offset),
+            )
+        else:
+            cur.execute(
+                """
+                SELECT id, metric, value, ideal_min, ideal_max, severity,
+                       message, suggestion, crop_type, crop_stage, created_at
+                FROM crop_alerts
+                ORDER BY created_at DESC
+                LIMIT %s OFFSET %s
+                """,
+                (limit, offset),
+            )
         rows = cur.fetchall()
-        # total count for pagination
-        cur.execute("SELECT COUNT(*) FROM crop_alerts")
+
+        # total count respects severity filter
+        if severity in ("warning", "critical"):
+            cur.execute("SELECT COUNT(*) FROM crop_alerts WHERE LOWER(severity) = %s", (severity,))
+        else:
+            cur.execute("SELECT COUNT(*) FROM crop_alerts")
         total = cur.fetchone()[0]
         cur.close()
-        conn.close()
 
         alerts = [
             {
@@ -339,4 +359,96 @@ def get_alerts():
         return jsonify({"alerts": alerts, "total": total, "limit": limit, "offset": offset}), 200
     except Exception as exc:
         print(f"[AI] Failed to fetch alerts: {exc}")
-        return jsonify({"alerts": [], "total": 0, "error": str(exc)}), 500
+        return jsonify({"message": "Database error"}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@ai_bp.route('/api/analytics/summary', methods=['GET'])
+def get_analytics_summary():
+    """Returns 24h overview: total alerts, health score, distribution."""
+    conn = None
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        
+        # 1. Total alerts last 24h
+        cur.execute("SELECT COUNT(*) FROM crop_alerts WHERE created_at >= NOW() - INTERVAL 1 DAY")
+        total_24h = cur.fetchone()[0]
+        
+        # 2. Distribution by metric
+        cur.execute("""
+            SELECT metric, COUNT(*) as count 
+            FROM crop_alerts 
+            WHERE created_at >= NOW() - INTERVAL 1 DAY 
+            GROUP BY metric
+        """)
+        distribution = [{"metric": m, "count": c} for m, c in cur.fetchall()]
+        
+        # 3. Health Score (% of time NOT in alert state)
+        # We estimate this by (1 - total_alerts / total_data_points)
+        cur.execute("SELECT COUNT(*) FROM sensor_readings WHERE timestamp_utc >= NOW() - INTERVAL 1 DAY")
+        total_points = cur.fetchone()[0] or 1  # avoid div by zero
+        health_score = max(0, min(100, (1 - (total_24h / total_points)) * 100))
+        
+        cur.close()
+        
+        # Primary risk is the metric with max count
+        primary_risk = "None"
+        if distribution:
+            primary_risk = max(distribution, key=lambda x: x["count"])["metric"]
+
+        return jsonify({
+            "total_alerts_24h": total_24h,
+            "distribution": distribution,
+            "health_score": round(health_score, 1),
+            "primary_risk": primary_risk.capitalize()
+        }), 200
+    except Exception as exc:
+        print(f"[AI] Analytics Error: {exc}")
+        return jsonify({"message": "Analytics error"}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@ai_bp.route('/api/analytics/trends', methods=['GET'])
+def get_analytics_trends():
+    """Returns hourly averages for the last 24h for CO2, Temp, Humidity."""
+    conn = None
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        
+        # We want hourly averages for the last 24 hours
+        cur.execute("""
+            SELECT 
+                HOUR(timestamp_utc) as hr,
+                AVG(CASE WHEN sensor_type = 'temperature' THEN value END) as temp,
+                AVG(CASE WHEN sensor_type = 'humidity' THEN value END) as humidity,
+                AVG(CASE WHEN sensor_type = 'co2' THEN value END) as co2
+            FROM sensor_readings
+            WHERE timestamp_utc >= NOW() - INTERVAL 1 DAY
+            GROUP BY hr
+            ORDER BY timestamp_utc ASC
+        """)
+        rows = cur.fetchall()
+        
+        trends = []
+        for r in rows:
+            trends.append({
+                "hour": f"{r[0]:02}:00",
+                "temp": round(float(r[1] or 0), 1),
+                "humidity": round(float(r[2] or 0), 1),
+                "co2": round(float(r[3] or 0), 1)
+            })
+            
+        cur.close()
+        return jsonify(trends), 200
+    except Exception as exc:
+        print(f"[AI] Trends Error: {exc}")
+        return jsonify({"message": "Trends error"}), 500
+    finally:
+        if conn:
+            conn.close()
