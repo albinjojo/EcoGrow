@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import './Dashboard.css'
+
+const NOTIF_KEY = 'ecogrow-browser-notif'
 
 const SEVERITY_COLOR = {
   critical: { border: '#ef4444', bg: '#fff1f2', badge: '#fee2e2', text: '#991b1b', icon: '🚨' },
@@ -32,6 +34,38 @@ const Alerts = () => {
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState(null)
   const [filter, setFilter] = useState('all')   // all | critical | warning
+  const [notifEnabled, setNotifEnabled] = useState(() => {
+    const stored = localStorage.getItem(NOTIF_KEY)
+    if (stored === null) {
+      // First visit — enable by default
+      localStorage.setItem(NOTIF_KEY, 'true')
+      return true
+    }
+    return stored === 'true'
+  })
+
+  const handleToggleNotif = useCallback(() => {
+    if (!notifEnabled) {
+      // Turning ON — request permission first
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission().then(perm => {
+          if (perm === 'granted') {
+            localStorage.setItem(NOTIF_KEY, 'true')
+            setNotifEnabled(true)
+          }
+        })
+      } else if ('Notification' in window && Notification.permission === 'granted') {
+        localStorage.setItem(NOTIF_KEY, 'true')
+        setNotifEnabled(true)
+      } else {
+        alert('Browser notifications are blocked. Please allow them in your browser settings.')
+      }
+    } else {
+      // Turning OFF
+      localStorage.setItem(NOTIF_KEY, 'false')
+      setNotifEnabled(false)
+    }
+  }, [notifEnabled])
 
   const fetchAlerts = async (off = offset, sev = filter, isInitial = false) => {
     if (isInitial) setLoading(true)
@@ -102,6 +136,23 @@ const Alerts = () => {
           <span style={{ fontSize: '11px', color: 'var(--c-text-tertiary)', fontFamily: 'var(--font-mono)' }}>
             {total} total · auto-refreshes every 30s
           </span>
+          <button
+            onClick={handleToggleNotif}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '6px',
+              padding: '5px 12px', fontSize: '11px', fontWeight: 700,
+              textTransform: 'uppercase', letterSpacing: '0.6px',
+              fontFamily: 'var(--font-mono)', cursor: 'pointer',
+              border: '1px solid',
+              borderColor: notifEnabled ? '#10b981' : 'var(--c-border-strong)',
+              background: notifEnabled ? '#ecfdf5' : 'transparent',
+              color: notifEnabled ? '#065f46' : 'var(--c-text-secondary)',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            {notifEnabled ? '🔔' : '🔕'}
+            {notifEnabled ? 'Notifications On' : 'Notifications Off'}
+          </button>
         </div>
       </div>
 

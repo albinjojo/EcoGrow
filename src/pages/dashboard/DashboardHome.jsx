@@ -105,8 +105,9 @@ const DashboardHome = () => {
 
   const dismissToast = useCallback((id) => setToasts(prev => prev.filter(t => t.id !== id)), [])
 
-  // ── Browser notification helper ──────────────────────────────────
+  // ── Browser notification helper (respects toggle from Alerts page) ──
   const sendBrowserNotif = useCallback((alert) => {
+    if (localStorage.getItem('ecogrow-browser-notif') !== 'true') return
     if (!('Notification' in window) || Notification.permission !== 'granted') return
     const icon = alert.severity === 'critical' ? '🚨' : '⚠️'
     new Notification(`${icon} EcoGrow ${alert.severity?.toUpperCase()} Alert`, {
@@ -116,8 +117,12 @@ const DashboardHome = () => {
     })
   }, [])
 
-  // Request browser notification permission once on mount
+  // Request browser notification permission once on mount + initialize toggle
   useEffect(() => {
+    // Default to enabled if user hasn't explicitly set a preference
+    if (localStorage.getItem('ecogrow-browser-notif') === null) {
+      localStorage.setItem('ecogrow-browser-notif', 'true')
+    }
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission()
     }
