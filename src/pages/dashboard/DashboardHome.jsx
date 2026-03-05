@@ -105,6 +105,24 @@ const DashboardHome = () => {
 
   const dismissToast = useCallback((id) => setToasts(prev => prev.filter(t => t.id !== id)), [])
 
+  // ── Browser notification helper ──────────────────────────────────
+  const sendBrowserNotif = useCallback((alert) => {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return
+    const icon = alert.severity === 'critical' ? '🚨' : '⚠️'
+    new Notification(`${icon} EcoGrow ${alert.severity?.toUpperCase()} Alert`, {
+      body: `[${(alert.label || alert.metric)?.toUpperCase()}] ${alert.message}`,
+      icon: '/vite.svg',
+      tag: `ecogrow-${alert.metric}-${Date.now()}`,
+    })
+  }, [])
+
+  // Request browser notification permission once on mount
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission()
+    }
+  }, [])
+
   // Calculate trends (simple comparison with previous data point)
   const getTrend = (current, key) => {
     if (sensorHistory.length < 2) return 'neutral'
@@ -166,6 +184,25 @@ const DashboardHome = () => {
       })
     })
 
+    // Real-time alert push from backend — fires browser notifications instantly
+    newSocket.on('new_alerts', (alerts) => {
+      if (!Array.isArray(alerts) || alerts.length === 0) return
+      const now = Date.now()
+      const newToasts = alerts
+        .filter(a => {
+          const last = lastAlertTimeRef.current[a.metric]
+          return !last || (now - last) >= ALERT_REFIRE_MS
+        })
+        .map(a => ({ ...a, id: `${a.metric}-${now}` }))
+      if (newToasts.length > 0) {
+        newToasts.forEach(t => {
+          lastAlertTimeRef.current[t.metric] = now
+          sendBrowserNotif(t)  // OS-level browser notification
+        })
+        setToasts(prev => [...newToasts, ...prev])
+      }
+    })
+
     newSocket.on('connect_error', (err) => {
       console.error('Socket connection error:', err)
       setConnectionStatus('Error')
@@ -201,7 +238,10 @@ const DashboardHome = () => {
             .filter(a => { const last = lastAlertTimeRef.current[a.metric]; return !last || (now - last) >= ALERT_REFIRE_MS })
             .map(a => ({ ...a, id: `${a.metric}-${now}` }))
           if (newToasts.length > 0) {
-            newToasts.forEach(t => { lastAlertTimeRef.current[t.metric] = now })
+            newToasts.forEach(t => {
+              lastAlertTimeRef.current[t.metric] = now
+              sendBrowserNotif(t)  // also fire browser notification
+            })
             setToasts(prev => [...newToasts, ...prev])
           }
         }

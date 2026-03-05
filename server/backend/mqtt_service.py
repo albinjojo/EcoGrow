@@ -14,6 +14,10 @@ socketio_instance = None
 # In-memory cache for throttling DB writes: { user_id: last_timestamp_utc }
 LAST_SAVED = {}
 
+# In-memory cooldown for real-time alert emissions: { metric_key: last_epoch }
+_ALERT_EMIT_COOLDOWN = {}
+_ALERT_COOLDOWN_SEC = 60  # don't re-emit the same metric alert within 60s
+
 # Global active user ID. We use this to decide which user is associated
 # with incoming hardware sensor data, since the raw MQTT streams don't carry web sessions.
 # This gets updated dynamically when a user logs into the web app.
@@ -50,6 +54,7 @@ def on_message(client, userdata, msg):
     1. Parse JSON
     2. Insert to DB (throttled to 1 min)
     3. Emit via SocketIO (live)
+    4. Check thresholds and emit new_alerts if out of range
     """
     try:
         payload = msg.payload.decode("utf-8")
@@ -84,6 +89,27 @@ def on_message(client, userdata, msg):
             }
             # Emit to all connected clients
             socketio_instance.emit("sensor_update", emit_data)
+
+            # 3. Real-time alert check — emit new_alerts for browser notifications
+            try:
+                from ai_service import _check_alerts, _gemini_suggestion
+                sensor_snapshot = {"co2": co2, "temp": temp, "humidity": humidity}
+                alerts = _check_alerts(sensor_snapshot, "lettuce", "vegetative")
+                if alerts:
+                    now = time.time()
+                    fresh_alerts = []
+                    for alert in alerts:
+                        metric = alert.get("metric", "")
+                        last = _ALERT_EMIT_COOLDOWN.get(metric, 0)
+                        if (now - last) >= _ALERT_COOLDOWN_SEC:
+                            alert["suggestion"] = _gemini_suggestion(alert, "lettuce", "vegetative")
+                            fresh_alerts.append(alert)
+                            _ALERT_EMIT_COOLDOWN[metric] = now
+                    if fresh_alerts:
+                        socketio_instance.emit("new_alerts", fresh_alerts)
+                        print(f"[MQTT] Emitted {len(fresh_alerts)} real-time alert(s) via SocketIO")
+            except Exception as alert_err:
+                print(f"[MQTT] Alert check error (non-fatal): {alert_err}")
             
     except Exception as e:
         print(f"[MQTT] Error processing message: {e}")
