@@ -13,7 +13,7 @@ except ImportError:
 
 ai_bp = Blueprint('ai_bp', __name__)
 
-MODEL_URL = "http://localhost:5001/predict"
+MODEL_URL = "https://greenhouseatmosphericrisk-predictionmodel.onrender.com/predict"
 
 # ── Crop ideal environmental ranges ─────────────────────────────────────────
 CROP_IDEAL_RANGES = {

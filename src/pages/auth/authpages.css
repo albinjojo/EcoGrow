@@ -192,6 +192,28 @@
   transform: translateY(-50%);
   color: var(--c-text-tertiary);
   pointer-events: none;
+  display: flex;
+  align-items: center;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--c-text-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: color 0.15s;
+}
+
+.password-toggle:hover {
+  color: var(--c-text-secondary);
 }
 
 /* --- Buttons --- */
