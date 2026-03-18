@@ -1,4 +1,3 @@
-
 import json
 import os
 import threading
@@ -43,7 +42,6 @@ def set_socketio(sio):
 def on_connect(client, userdata, flags, rc):
     if rc == 0:
         print("[MQTT] Connected to Broker")
-        # Subscribe to sensors topic
         client.subscribe("ecogrow/sensors")
     else:
         print(f"[MQTT] Connection Failed. Return Code: {rc}")
@@ -58,19 +56,16 @@ def on_message(client, userdata, msg):
     """
     try:
         payload = msg.payload.decode("utf-8")
-        # print(f"[MQTT] Received: {payload}")
         
         data = json.loads(payload)
         
-        # Expected keys: co2, temp, humidity
         co2 = float(data.get("co2", 0))
         temp = float(data.get("temp", 0))
         humidity = float(data.get("humidity", 0))
         
-        # Default to the active web session user rather than hardcoded 1
         user_id = data.get("user_id", ACTIVE_MQTT_USER_ID)
 
-        # 0. Update in-memory snapshot (always, for instant access by ai_service)
+        # 0. Update in-memory snapshot
         LATEST_SENSOR_DATA["co2"]       = co2
         LATEST_SENSOR_DATA["temp"]      = temp
         LATEST_SENSOR_DATA["humidity"]  = humidity
@@ -87,10 +82,9 @@ def on_message(client, userdata, msg):
                 "humidity": humidity,
                 "timestamp": datetime.now().strftime("%H:%M:%S")
             }
-            # Emit to all connected clients
             socketio_instance.emit("sensor_update", emit_data)
 
-            # 3. Real-time alert check — emit new_alerts for browser notifications
+            # 3. Real-time alert check
             try:
                 from ai_service import _check_alerts, _gemini_suggestion
                 sensor_snapshot = {"co2": co2, "temp": temp, "humidity": humidity}
@@ -113,7 +107,6 @@ def on_message(client, userdata, msg):
             
     except Exception as e:
         print(f"[MQTT] Error processing message: {e}")
-        # traceback.print_exc()
 
 def save_to_db_throttled(user_id, co2, temp, humidity):
     """
@@ -127,7 +120,7 @@ def save_to_db_throttled(user_id, co2, temp, humidity):
     # 1. Check Memory Cache
     last_time = LAST_SAVED.get(user_id)
     
-    # 2. If Cache Miss, Check Database (Handle restart case)
+    # 2. If Cache Miss, Check Database
     if not last_time:
         conn = get_connection()
         try:
@@ -142,21 +135,18 @@ def save_to_db_throttled(user_id, co2, temp, humidity):
             
             if row:
                 db_time = row[0]
-                # Ensure timezone awareness
                 if db_time.tzinfo is None:
                     db_time = db_time.replace(tzinfo=timezone.utc)
                 last_time = db_time
-                # Update Cache
                 LAST_SAVED[user_id] = last_time
         except Exception:
-            pass # On error, proceed safely or assume no previous data
+            pass
             
     # 3. Check Interval
     if last_time:
         diff = (now_utc - last_time).total_seconds()
-        # Enforce 60-second interval
         if diff < 60:
-            return  # Skip DB insert
+            return
             
     # 4. Insert Data
     conn = get_connection()
@@ -177,7 +167,6 @@ def save_to_db_throttled(user_id, co2, temp, humidity):
         conn.commit()
         cur.close()
         
-        # Update Cache
         LAST_SAVED[user_id] = now_utc
         print(f"[MQTT] Data Saved for User {user_id} (Throttled Insert)")
         
@@ -191,26 +180,25 @@ def start_mqtt_client():
     """
     Starts the MQTT client in a non-blocking background thread.
     """
-    broker_address = "e66b0f01.ala.asia-southeast1.emqxsl.com"
-    port = 8883 # SSL port
-    
-    # Generate unique ID
+    broker_address = "e940b6ecad9b415cbf9c361f773ed91c.s1.eu.hivemq.cloud"
+    port = 8883
+
     client_id = f"ecogrow_backend_{int(time.time())}"
     client = mqtt.Client(client_id=client_id)
-    
-    # TLS Settings
-    client.tls_set(ca_certs=None, certfile=None, keyfile=None, cert_reqs=mqtt.ssl.CERT_REQUIRED, tls_version=mqtt.ssl.PROTOCOL_TLSv1_2)
-    
-    # Credentials
-    client.username_pw_set("ecogrow", "albin2004")
-    
+
+    client.tls_set(ca_certs=None, certfile=None, keyfile=None,
+                   cert_reqs=mqtt.ssl.CERT_NONE,
+                   tls_version=mqtt.ssl.PROTOCOL_TLSv1_2)
+    client.tls_insecure_set(True)
+
+    client.username_pw_set("albinjojo", "Albin@2004")
+
     client.on_connect = on_connect
     client.on_message = on_message
-    
+
     try:
         client.connect(broker_address, port, 60)
-        client.loop_start() # Starts a background thread
+        client.loop_start()
         print("[MQTT] Service Started")
     except Exception as e:
         print(f"[MQTT] Failed to start: {e}")
-
