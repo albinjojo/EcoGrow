@@ -1,119 +1,133 @@
-# 🌱 EcoGrow – Greenhouse Environment Monitoring System
+# EcoGrow: Greenhouse Environmental Monitoring and Management Platform
 
-EcoGrow is an IoT-based greenhouse monitoring system that uses an ESP32 and sensors to measure temperature, humidity, and CO₂ levels in real time. An AI model analyzes these readings to check whether the environment is safe for plant growth or if it may lead to harmful bacteria or fungal development. The system provides alerts when conditions become risky and also stores historical data to help farmers understand environmental changes over time.
+EcoGrow is an integrated IoT solution designed for precision agriculture. The platform leverages edge computing, real-time telemetry, and predictive analytics to monitor greenhouse environments and mitigate biological risks to plant growth. 
 
-## ⭐ Key Features
+The system utilizes an ESP32-based hardware layer to collect high-granularity sensor data, which is then processed through a dual-service backend architecture to provide real-time monitoring, AI-driven risk assessment, and comprehensive historical reporting.
 
-- **Real-time Monitoring**: Tracks Temperature, Humidity, and CO₂ levels.
-- **AI Analysis**: Detects unsafe environmental conditions and predicts bacteria/fungus growth risks.
-- **Alert System**: Notifies users when environmental risks increase.
-- **Historical Data**: Visualizes past readings and trends.
-- **User Management**: Secure login/signup including Google OAuth.
+---
 
-## 🛠️ Tech Stack
+## System Architecture
 
-### Frontend
-- **React.js** (Vite)
-- **Recharts** for data visualization
-- **Socket.io-client** for real-time updates
+The EcoGrow ecosystem is partitioned into several distinct functional layers:
 
-### Backend
-- **Python Flask**: Core API and business logic
-- **MySQL**: Relational database for storage
-- **MQTT (Paho)**: IoT data ingestion
-- **Socket.io**: Real-time communication with frontend
-- **Google OAuth**: User authentication
+### 1. Edge Layer (Hardware)
+- **ESP32 Microcontroller**: Serves as the primary IoT gateway.
+- **Sensor Integration**: Captures temperature, relative humidity, and CO2 concentrations.
+- **Data Ingestion**: Transmits telemetry over MQTT to the centralized broker.
 
-### IoT (Hardware)
-- **ESP32**: Microcontroller for sensor data collection
+### 2. Communication and Messaging
+- **MQTT (Paho)**: High-performance messaging protocol for low-latency data transmission.
+- **Socket.io**: Enables bi-directional, real-time communication between the backend services and the presentation layer.
 
-## 📂 Project Structure
+### 3. Core Services Layer (Python/Flask)
+- **IoT Hub**: Manages MQTT client sessions and sensor data normalization.
+- **Inference Engine**: Executes predictive models to identify risks of bacterial or fungal proliferation.
+- **Background Scheduler**: Periodically evaluates environmental conditions and triggers autonomous alerts.
+- **Data Persistence**: Interfaces with MySQL for historical record-keeping.
 
-```
+### 4. Identity and Session Management (Node.js/Express)
+- **Authentication Microservice**: Handles JWT-based user authentication and Google OAuth 2.0 integration.
+- **Secure Sessions**: Implements cookie-based session management and identity verification.
+
+### 5. Presentation Layer (React/Vite)
+- **Monitoring Dashboard**: Real-time visualization using Recharts for telemetric data.
+- **Administrative Interface**: Dedicated portal for user management and system status monitoring.
+- **Risk Analytics**: Dedicated interface for AI-generated environmental insights.
+
+---
+
+## Technical Specifications
+
+- **Predictive Analytics**: Integrated with Gemini AI for advanced environmental risk forecasting and mitigation suggestions.
+- **Telemetry Processing**: Real-time data stream processing with sub-second latency from edge to dashboard.
+- **Identity Management**: Modular authentication service with support for multi-provider login and role-based access control (RBAC).
+- **Automated Testing**: Comprehensive end-to-end validation suite using Selenium.
+
+---
+
+## Project Structure
+
+```text
 ecogrow/
-├── src/                  # Frontend React application
-│   ├── components/       # Reusable UI components
-│   ├── pages/            # Application pages
-│   ├── services/         # API and service calls
-│   └── context/          # React Context (Auth, etc.)
+├── src/                    # Frontend Application (React/Vite)
+│   ├── pages/              # Functional views (Dashboard, Admin, Auth)
+│   ├── components/         # Modular UI elements
+│   └── services/           # API integration layer
 ├── server/
-│   ├── backend/          # Python Flask Backend
-│   │   ├── app.py        # Main entry point for Flask app
-│   │   ├── ai_service.py # AI logic for risk prediction
-│   │   ├── mqtt_service.py # MQTT client handling
-│   │   └── sensor_handler.py # Sensor data processing
-│   └── db/
-│       └── schema.sql    # Database schema structure
-├── public/               # Static assets
-└── package.json          # Frontend dependencies and scripts
+│   ├── backend/            # Core IoT and AI Service (Python/Flask)
+│   │   ├── app.py          # Service entry point and scheduler
+│   │   ├── ai_service.py   # Risk analysis logic
+│   │   └── mqtt_service.py # Telemetry ingestion client
+│   ├── index.js            # Authentication Service (Node.js/Express)
+│   └── db/                 # Database schema and migration scripts
+├── seleniumtest.py         # E2E Automation Suite
+└── package.json            # Deployment and dependency configuration
 ```
 
-## 🚀 Getting Started
+---
+
+## Installation and Configuration
 
 ### Prerequisites
-- Node.js & npm
-- Python 3.x
-- MySQL Server
-- MQTT Broker (e.g., EMQX, Mosquitto)
+- Python 3.9+
+- Node.js 18+
+- MySQL Server 8.0+
+- MQTT Broker (EMQX or Mosquitto recommended)
 
-### 1. Database Setup
-1. Create a MySQL database (e.g., `ecogrow_db`).
-2. Import the schema from `server/db/schema.sql` into the database.
+### 1. Database Initialization
+Execute the following SQL commands or import `server/db/schema.sql` into your MySQL instance:
+```sql
+CREATE DATABASE ecogrow_db;
+```
 
-### 2. Backend Setup
-Navigate to the backend directory and install dependencies:
+### 2. Core Service Configuration (Python)
+Navigate to `server/backend/` and install dependencies:
 ```bash
-cd server/backend
 pip install -r requirements.txt
 ```
+Configure external service parameters in the `.env` file (Database, MQTT Broker, Gemini API Key).
 
-Create a `.env` file in `server/backend/` with the following variables:
-```env
-# Database Configuration
-DB_HOST=localhost
-DB_USER=root
-DB_PASSWORD=your_password
-DB_NAME=ecogrow_db
-
-# Security & Auth
-FLASK_SECRET=your_super_secret_key
-GOOGLE_CLIENT_ID=your_google_client_id
-GOOGLE_CLIENT_SECRET=your_google_client_secret
-GOOGLE_REDIRECT_URI=http://localhost:5000/api/google/callback
-
-# MQTT Configuration
-MQTT_BROKER=your_mqtt_broker_url
-MQTT_PORT=8883
-MQTT_TOPIC=ecogrow/sensors
-```
-
-Run the backend server:
+Start the core service:
 ```bash
 python app.py
 ```
-*The backend server will start on port 5000.*
 
-### 3. Frontend Setup
-Navigate to the project root and install dependencies:
+### 3. Authentication Service Configuration (Node.js)
+Install Node.js dependencies in the project root:
 ```bash
 npm install
 ```
+Start the authentication microservice:
+```bash
+npm run dev:server
+```
 
-Run the frontend development server:
+### 4. Development Environment (Frontend)
+Initialize the Vite development server:
 ```bash
 npm run dev
 ```
-*The frontend will generally start on http://localhost:5173.*
 
-## 🧪 Usage
-1. Open the frontend in your browser.
-2. Sign up or log in.
-3. View the Dashboard to see real-time sensor data from your ESP32.
-4. Check Reports for historical analysis and AI risk predictions.
+---
 
-## 🤝 Contributing
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+## Testing Infrastructure
+
+The project includes a Selenium-based automated testing suite for validating critical user flows:
+- **TC01**: Authenticated session establishment.
+- **TC02**: CSV/Excel report generation and data export validation.
+- **TC03**: Real-time notification toggle and UI state persistence.
+
+To execute tests:
+```bash
+python seleniumtest.py
+```
+
+---
+
+## Deployment Reference
+
+The application is architected for deployment on AWS EC2 instances. Ensure that the security groups are configured to allow traffic on the following ports:
+- **5173**: Frontend Development Server
+- **5000**: Core IoT/AI Service
+- **4000**: Authentication Microservice
+- **8883/1883**: MQTT Broker Traffic
